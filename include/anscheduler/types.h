@@ -41,12 +41,15 @@ struct task_t {
   uint64_t descriptorsLock;
   anidxset_root_t descriptors;
   
-  uint64_t refCounts;
+  uint64_t killLock;
+  uint64_t refCount; // when this reaches 0 and isKilled = 1, kill this task
+  uint64_t isKilled; // 0 or 1, starts at 0
 } __attribute__((packed));
 
 struct thread_t {
   thread_t * next, * last;
-  task_t * task;
+  thread_t * queueNext, * queueLast;
+  
   uint64_t nextTimestamp;
   uint64_t stack;
   

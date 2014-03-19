@@ -21,6 +21,16 @@ void anscheduler_loop_push_cur();
 void anscheduler_loop_run();
 
 /**
+ * Switches from this thread to a different thread.  In order to call this
+ * method, you must have already set isPolling back to 0 so that no other task
+ * will attempt to switch into this one.
+ * @param task A referenced task
+ * @param thread The thread in the task
+ * @critical
+ */
+void anscheduler_loop_switch(task_t * task, thread_t * thread);
+
+/**
  * There is an internal lock which needs to be held in order to change the
  * running state of any thread. This method locks that lock.
  * @critical
