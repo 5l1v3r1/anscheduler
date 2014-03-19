@@ -4,7 +4,7 @@ static void * anscheduler_idxset_alloc();
 static void anscheduler_idxset_free(void * ptr);
 
 uint8_t anscheduler_idxset_init(anidxset_root_t * root) {
-  return anidxset_initialize(&task->descriptors,
+  return anidxset_initialize(root,
                              anscheduler_idxset_alloc,
                              anscheduler_idxset_free);
 }
@@ -14,6 +14,6 @@ static void * anscheduler_idxset_alloc() {
 }
 
 static void anscheduler_idxset_free(void * ptr) {
-  anscheduler_free(0x1000);
+  anscheduler_free(ptr);
 }
 

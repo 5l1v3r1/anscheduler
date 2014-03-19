@@ -1,5 +1,5 @@
 CFILES = $(wildcard src/*.c)
-INCLUDES += -I./include -I./libs/anidxset/src
+override INCLUDES += -I./include -I./lib/anidxset/src
 
 objects: build
 	for file in $(CFILES); do \
