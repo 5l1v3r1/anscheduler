@@ -1,6 +1,8 @@
 #include <anscheduler/task.h>
 #include <anscheduler/functions.h>
-#include "util.h"
+#include <anscheduler/loop.h> // for kernel threads
+#include <anscheduler/thread.h> // for deallocation
+#include "util.h" // for idxset
 
 /**
  * @critical
@@ -218,11 +220,13 @@ static bool _copy_task_code(task_t * task, void * ptr, uint64_t len) {
     } else {
       uint8_t * bytes = (uint8_t *)buff;
       uint8_t * source = (uint8_t *)(ptr + (i << 12));
-      for (i = 0; i < len & 0xfff; i++) {
+      for (i = 0; i < (len & 0xfff); i++) {
         bytes[i] = source[i];
       }
     }
   }
+  
+  return true;
 }
 
 static void _dealloc_task_code(task_t * task, uint64_t pageCount) {
@@ -251,14 +255,14 @@ static void _generate_kill_job(task_t * task) {
   thread_t * thread = task->firstThread;
   while (thread) {
     anscheduler_loop_delete(thread);
-    thread = thread->nextThread;
+    thread = thread->next;
   }
   
   // Generate a kernel thread and pass it our task.
   anscheduler_loop_push_kernel(task, (void (*)(void *))_free_task_method);
 }
 
-static void _task_free_method(task_t * task) {
+static void _free_task_method(task_t * task) {
   // close the task's sockets, release the task's code (and free it, maybe),
   // free each thread's kernel and user stack
   
