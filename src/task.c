@@ -67,7 +67,6 @@ task_t * anscheduler_task_fork(task_t * aTask) {
   }
   
   task->codeRetainCount = aTask->codeRetainCount;
-  anscheduler_inc(aTask->codeRetainCount);
   
   // map each page until we reach a blank page
   uint64_t i = ANSCHEDULER_TASK_CODE_PAGE;
@@ -95,6 +94,7 @@ task_t * anscheduler_task_fork(task_t * aTask) {
     anscheduler_unlock(&task->vmLock);
   }
   
+  anscheduler_inc(aTask->codeRetainCount);
   return task;
 }
 
