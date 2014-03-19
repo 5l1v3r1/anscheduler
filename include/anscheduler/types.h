@@ -1,3 +1,6 @@
+#ifndef __ANSCHEDULER_TYPES_H__
+#define __ANSCHEDULER_TYPES_H__
+
 #include <anscheduler_consts.h> // should declare int types, etc.
 #include <anscheduler_state.h> // you must create this
 #include <anidxset.h>
@@ -6,12 +9,17 @@ typedef struct task_t task_t;
 typedef struct thread_t thread_t;
 typedef struct socket_t socket_t;
 typedef struct socket_link_t socket_link_t;
+typedef struct socket_msg_t socket_msg_t;
 
 struct task_t {
   task_t * next, * last;
   
   uint64_t pid;
   uint64_t uid;
+  
+  // when this task exits, *codeRetainCount-- is performed. If the new
+  // value is 0, then the code data of this task is deallocated.
+  uint64_t * codeRetainCount;
   
   // virtual memory structure
   uint64_t vmLock;
@@ -32,6 +40,8 @@ struct task_t {
   // the index set for allocating socket descriptors
   uint64_t descriptorsLock;
   anidxset_root_t descriptors;
+  
+  uint64_t refCounts;
 } __attribute__((packed));
 
 struct thread_t {
@@ -42,20 +52,38 @@ struct thread_t {
   
   uint64_t interestsLock; // applies to the following 3 flags
   uint64_t interests; // (1 << n) masked for each IRQ# and 2^63 for socket
-  uint64_t pending; // a flag is set whenever an external notification comes in
-  uint64_t isActive; // 0 if waiting for an interest
+  uint64_t pending; // interests pending
+  uint64_t isPolling; // 1 if waiting for an interest
   
   anscheduler_state state;
 } __attribute__((packed));
 
 struct socket_t {
-  uint64_t lock;
-  uint64_t retainCount;
-  socket_link_t * firstLink;
+  task_t * connector, * receiver;
+  
+  uint64_t msgsLock;
+  socket_msg_t * firstMsg;
 } __attribute__((packed));
 
 struct socket_link_t {
   socket_link_t * next, * last;
   socket_t * socket;
-  uint64_t descriptor; // unused for socket_t's reference
+  uint64_t descriptor;
 } __attribute__((packed));
+
+struct socket_msg_t {
+  socket_msg_t * next;
+  uint64_t type;
+  uint64_t length;
+  // data array after this point in the object (0x18 bytes in)
+  
+  // message types:
+  // 0 = connect
+  // 1 = data
+  // 2 = closed by remote
+  // 3 = remote killed by external task
+  // 4 = remote exit
+  // 5 = remote killed because of memory fault
+} __attribute__((packed));
+
+#endif
