@@ -37,4 +37,11 @@ uint64_t anscheduler_thread_poll(uint64_t flags);
  */
 void anscheduler_thread_exit();
 
+/**
+ * Deallocates a thread's kernel and user stack, locking the CPU when needed.
+ * @noncritical This function can be interrupted or terminated at any time;
+ * no memory will be leaked if proper cleanup is done later.
+ */
+void anscheduler_thread_deallocate(task_t * task, thread_t * thread);
+
 #endif

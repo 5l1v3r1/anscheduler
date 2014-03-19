@@ -269,6 +269,19 @@ static void _task_free_method(task_t * task) {
     anscheduler_free(task->codeRetainCount);
     anscheduler_cpu_unlock();
   }
+  
+  // free each thread and all its resources
+  while (task->firstThread) {
+    thread_t * thread = task->firstThread;
+    task->firstThread = thread->next;
+    anscheduler_thread_deallocate(task, thread);
+    anscheduler_cpu_lock();
+    anscheduler_free(thread);
+    anscheduler_cpu_unlock();
+  }
+  
+  // TODO: close sockets here, once they are implemented and I understand
+  // how they will work better.
 }
 
 static void _dealloc_task_code_async(task_t * task) {
