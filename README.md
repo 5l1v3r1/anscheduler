@@ -8,7 +8,7 @@ The `anidxset` subtree was setup as follows:
 
     git remote add anidxset https://github.com/unixpickle/anidxset.git
     git fetch anidxset
-    git checkout -b anpages anidxset/master
+    git checkout -b anidxset anidxset/master
     git checkout master
     git read-tree --prefix=lib/anidxset/ -u anidxset
 
