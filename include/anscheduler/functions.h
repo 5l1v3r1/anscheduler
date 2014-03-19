@@ -22,8 +22,9 @@
 /**
  * Allocates at least `size` bytes. For kernels with page-sized allocators
  * only, this should return NULL if `size` is greater than the maximum page
- * size.
- * @return Address to the beginning of the new buffer, or 0/NULL on failure.
+ * size. Additionally, this address must be aligned on a 4KB page boundary.
+ * @return Address to the beginning of the new buffer, or NULL on failure.
+ * @critical
  */
 void * anscheduler_alloc(uint64_t size);
 void anscheduler_free(void * buffer);
@@ -32,12 +33,17 @@ void anscheduler_lock(uint64_t * ptr);
 void anscheduler_unlock(uint64_t * ptr);
 
 void anscheduler_abort(const char * error);
+void anscheduler_zero(void * buf, int len);
+void anscheduler_inc(uint64_t * ptr);
 
 /*********************
  * Context Switching *
  *********************/
 
-void anscheduler_thread_run(thread_t * thread);
+/**
+ * @param task Must have a reference to it.
+ */
+void anscheduler_thread_run(task_t * task, thread_t * thread);
 
 /*********
  * Timer *
@@ -53,8 +59,16 @@ uint64_t anscheduler_second_length();
  * CPU Context *
  ***************/
 
+/**
+ * @noncricital Why would you call this if not from a noncritical section?
+ */
 void anscheduler_cpu_lock(); // enter critical section
+
+/**
+ * @critical You should only unlock the CPU if you have a reason to!.
+ */
 void anscheduler_cpu_unlock(); // leave critical section
+
 task_t * anscheduler_cpu_get_task();
 thread_t * anscheduler_cpu_get_thread();
 void anscheduler_cpu_set_task(task_t * task);
@@ -62,18 +76,35 @@ void anscheduler_cpu_set_thread(thread_t * thread);
 
 void anscheduler_cpu_notify_invlpg(task_t * task, uint64_t page);
 void anscheduler_cpu_notify_dead(task_t * task);
+
+/**
+ * @noncritical Calling from a critical section would hang this CPU.
+ */
 void anscheduler_cpu_halt(); // wait until timer or interrupt
 
 /******************
  * Virtual Memory *
  ******************/
 
+/**
+ * @noncritical This should be relatively simple and static.
+ */
+uint64_t anscheduler_vm_physical(uint64_t virt); // global VM translation
+
+/**
+ * @noncritical See anscheduler_vm_physical().
+ */
+uint64_t anscheduler_vm_virtual(uint64_t phys); // global VM translation
+
 void * anscheduler_vm_root_alloc();
-void anscheduler_vm_map(void * root,
+bool anscheduler_vm_map(void * root,
                         uint64_t vpage,
                         uint64_t dpage,
                         uint16_t flags);
-void anscheduler_vm_unmap(void * root, uint64_t void);
+void anscheduler_vm_unmap(void * root, uint64_t vpage);
+uint64_t anscheduler_vm_lookup(void * root,
+                               uint64_t vpage,
+                               uint16_t * flags);
 void anscheduler_vm_root_free(void * root);
 
 #endif

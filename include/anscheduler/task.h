@@ -3,6 +3,12 @@
 
 #include "types.h"
 
+// maximum of 0x100000 threads when it's done this way
+#define ANSCHEDULER_TASK_CODE_PAGE              0x400
+#define ANSCHEDULER_TASK_KERN_STACKS_PAGE    0x100000
+#define ANSCHEDULER_TASK_USER_STACKS_PAGE    0x200000
+#define ANSCHEDULER_TASK_DATA_PAGE         0x10200000
+
 /**
  * Creates a task by allocating a new page table and mapping+copying new pages
  * in from `code` of length `len`.
@@ -42,9 +48,10 @@ void anscheduler_task_kill(task_t * task);
 
 /**
  * While references are held to a task, it cannot be killed.
+ * @return false if the task has been killed.
  * @critical
  */
-void anscheduler_task_reference(task_t * task);
+bool anscheduler_task_reference(task_t * task);
 
 /**
  * See task_reference(). Note that if the reference count gets to 0 and the

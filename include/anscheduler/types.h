@@ -18,7 +18,8 @@ struct task_t {
   uint64_t uid;
   
   // when this task exits, *codeRetainCount-- is performed. If the new
-  // value is 0, then the code data of this task is deallocated.
+  // value is 0, then the code data of this task is deallocated and so is
+  // the pointer to codeRetainCount.
   uint64_t * codeRetainCount;
   
   // virtual memory structure
@@ -49,6 +50,7 @@ struct task_t {
 struct thread_t {
   thread_t * next, * last;
   thread_t * queueNext, * queueLast;
+  task_t * task;
   
   uint64_t nextTimestamp;
   uint64_t stack;

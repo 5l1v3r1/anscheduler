@@ -30,4 +30,11 @@ void anscheduler_thread_add(task_t * task, thread_t * thread);
  */
 uint64_t anscheduler_thread_poll(uint64_t flags);
 
+/**
+ * Call this to exit the current thread, presumably in a syscall handler.
+ * @noncritical This potentially frees lots of memory, so it should be called
+ * from a thread's execution state in kernel mode.
+ */
+void anscheduler_thread_exit();
+
 #endif
