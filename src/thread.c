@@ -1,21 +1,22 @@
 #include <anscheduler/thread.h>
 #include <anscheduler/task.h>
 #include <anscheduler/functions.h>
+#include <anscheduler/loop.h>
 
 /**
  * @critical
  */
-bool _alloc_kernel_stack(thread_t * thread);
+bool _alloc_kernel_stack(task_t * task, thread_t * thread);
 
 /**
  * @critical
  */
-bool _map_user_stack(thread_t * thread);
+bool _map_user_stack(task_t * task, thread_t * thread);
 
 /**
  * @critical
  */
-void _dealloc_kernel_stack(thread_t * thread);
+void _dealloc_kernel_stack(task_t * task, thread_t * thread);
 
 thread_t * anscheduler_create_thread(task_t * task) {
   thread_t * thread = anscheduler_alloc(sizeof(thread_t));
@@ -37,7 +38,7 @@ thread_t * anscheduler_create_thread(task_t * task) {
   thread->task = task;
   thread->stack = stack;
   
-  if (!_alloc_kernel_stack(thread)) {
+  if (!_alloc_kernel_stack(task, thread)) {
     anscheduler_lock(&task->stacksLock);
     anidxset_put(&task->stacks, stack);
     anscheduler_unlock(&task->stacksLock);
@@ -46,8 +47,8 @@ thread_t * anscheduler_create_thread(task_t * task) {
   }
   
   // map the user stack
-  if (!_map_user_stack(thread)) {
-    _dealloc_kernel_stack(thread);
+  if (!_map_user_stack(task, thread)) {
+    _dealloc_kernel_stack(task, thread);
     anscheduler_lock(&task->stacksLock);
     anidxset_put(&task->stacks, stack);
     anscheduler_unlock(&task->stacksLock);
@@ -58,9 +59,21 @@ thread_t * anscheduler_create_thread(task_t * task) {
   return thread;
 }
 
-bool _alloc_kernel_stack(thread_t * thread) {
-  task_t * task = thread->task;
+void anscheduler_thread_add(task_t * task, thread_t * thread) {
+  // add the thread to the task's linked list
+  anscheduler_lock(&task->threadsLock);
+  thread_t * next = task->firstThread;
+  if (next) next->last = thread;
+  task->firstThread = thread;
+  thread->last = NULL;
+  thread->next = next;
+  anscheduler_unlock(&task->threadsLock);
   
+  // add the thread to the queue
+  anscheduler_loop_push(thread);
+}
+
+bool _alloc_kernel_stack(task_t * task, thread_t * thread) {
   // allocate the kernel stack
   void * buffer = anscheduler_alloc(0x1000);
   if (!buffer) return false;
@@ -81,9 +94,7 @@ bool _alloc_kernel_stack(thread_t * thread) {
   return true;
 }
 
-bool _map_user_stack(thread_t * thread) {
-  task_t * task = thread->task;
-  
+bool _map_user_stack(task_t * task, thread_t * thread) {
   // map the user stack as to-allocate
   uint64_t flags = ANSCHEDULER_PAGE_FLAG_UNALLOC
     | ANSCHEDULER_PAGE_FLAG_USER
@@ -110,9 +121,7 @@ bool _map_user_stack(thread_t * thread) {
   return true;
 }
 
-void _dealloc_kernel_stack(thread_t * thread) {
-  task_t * task = thread->task;
-  
+void _dealloc_kernel_stack(task_t * task, thread_t * thread) {
   // get the phyPage and unmap it
   uint64_t page = ANSCHEDULER_TASK_KERN_STACKS_PAGE + thread->stack;
   anscheduler_lock(&task->vmLock);

@@ -23,6 +23,11 @@ void anscheduler_loop_push_cur();
 void anscheduler_loop_delete(thread_t * thread);
 
 /**
+ * Used to add a thread to the scheduling queue.
+ */
+void anscheduler_loop_push(thread_t * newThread);
+
+/**
  * Enters the scheduling loop.  This function should never return.
  * @critical
  */
