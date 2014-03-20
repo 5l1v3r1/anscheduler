@@ -108,7 +108,7 @@ void anscheduler_thread_exit() {
   
   anscheduler_cpu_lock();
   anscheduler_loop_push_kernel(thread,
-                               (void (*)(void *)_finish_thread_dealloc);
+                               (void (*)(void *))_finish_thread_dealloc);
   
   // Running the loop without a push means this thread will never be executed
   // again; just what we want. Additionally, doing this will leave the task
