@@ -288,6 +288,9 @@ static void _free_task_method(task_t * task) {
   
   // TODO: close sockets here, once they are implemented and I understand
   // how they will work better.
+  
+  anscheduler_cpu_lock();
+  anscheduler_loop_delete_cur_kernel();
 }
 
 static void _dealloc_task_code_async(task_t * task) {

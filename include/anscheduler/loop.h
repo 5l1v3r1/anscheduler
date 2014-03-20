@@ -40,10 +40,18 @@ void anscheduler_loop_push(thread_t * newThread);
 void anscheduler_loop_run();
 
 /**
- * Add a kernel thread to the scheduler queue.
+ * Add a kernel thread to the scheduler queue. The kernel thread must not exit
+ * via anscheduler_thread_exit(), but rather through 
+ * anscheduler_loop_delete_cur_kernel()
  * @critical
  */
 void anscheduler_loop_push_kernel(void * arg, void (* fn)(void * arg));
+
+/**
+ * Deletes the current kernel thread, freeing its memory and not adding it
+ * back to the queue.
+ */
+void anscheduler_loop_delete_cur_kernel();
 
 /**
  * Switches from this thread to a different thread.  In order to call this

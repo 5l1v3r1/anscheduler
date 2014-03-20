@@ -88,6 +88,14 @@ void anscheduler_cpu_notify_invlpg(task_t * task);
 void anscheduler_cpu_notify_dead(task_t * task);
 
 /**
+ * Calls a function `fn` with an argument `arg` using a stack dedicated to
+ * this CPU. This is useful for the last part of any thread kill, when the
+ * thread's own kernel stack must be freed.
+ * @critical
+ */
+void anscheduler_cpu_stack_run(void * arg, void (* fn)(void * a));
+
+/**
  * @noncritical Calling from a critical section would hang this CPU.
  */
 void anscheduler_cpu_halt(); // wait until timer or interrupt
