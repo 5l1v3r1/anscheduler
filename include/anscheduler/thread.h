@@ -10,7 +10,7 @@
  * @critical This doesn't take too much time because the user stack is
  * allocated lazily.
  */
-thread_t * anscheduler_thread_create(task_t * task, void * rip);
+thread_t * anscheduler_thread_create(task_t * task);
 
 /**
  * Adds a thread to a task.
