@@ -73,6 +73,23 @@ void anscheduler_thread_add(task_t * task, thread_t * thread) {
   anscheduler_loop_push(thread);
 }
 
+uint64_t anscheduler_thread_poll(uint64_t flags) {
+  thread_t * thread = anscheduler_cpu_get_thread();
+  
+  anscheduler_lock(&thread->interestsLock);
+  if (thread->pending & flags) {
+    uint64_t pending = thread->pending & flags;
+    thread->pending ^= pending;
+    anscheduler_unlock(&thread->interestsLock);
+    return pending;
+  }
+  thread->interests = flags;
+  thread->isPolling = true;
+  anscheduler_unlock(&thread->interestsLock);
+  
+  return 0;
+}
+
 bool _alloc_kernel_stack(task_t * task, thread_t * thread) {
   // allocate the kernel stack
   void * buffer = anscheduler_alloc(0x1000);

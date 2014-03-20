@@ -12,6 +12,12 @@ void anscheduler_loop_initialize();
  * Pushes the current thread back to the run loop for another time. This must
  * be called before running anscheduler_loop_run() function. However,
  * anscheduler_loop_switch() calls this automatically.
+ *
+ * @discussion If you are calling this, you must be sure that you have
+ * already switched to a CPU-specific kernel stack that is not associated
+ * with the thread; otherwise, the next CPU running the thread could smash
+ * our stack.
+ *
  * @critical
  */
 void anscheduler_loop_push_cur();
