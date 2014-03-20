@@ -280,6 +280,8 @@ static void _free_task_method(task_t * task) {
     task->firstThread = thread->next;
     anscheduler_thread_deallocate(task, thread);
     anscheduler_cpu_lock();
+    void * stack = anscheduler_thread_kernel_stack(task, thread);
+    anscheduler_free(stack);
     anscheduler_free(thread);
     anscheduler_cpu_unlock();
   }

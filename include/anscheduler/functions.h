@@ -60,21 +60,31 @@ uint64_t anscheduler_second_length();
  ***************/
 
 /**
+ * Enter a critical section.
  * @noncricital Why would you call this if not from a noncritical section?
  */
-void anscheduler_cpu_lock(); // enter critical section
+void anscheduler_cpu_lock();
 
 /**
+ * Leave a critical section.
  * @critical You should only unlock the CPU if you have a reason to!.
  */
-void anscheduler_cpu_unlock(); // leave critical section
+void anscheduler_cpu_unlock();
 
+/**
+ * @critical
+ */
 task_t * anscheduler_cpu_get_task();
+
+/**
+ * @critical
+ */
 thread_t * anscheduler_cpu_get_thread();
+
 void anscheduler_cpu_set_task(task_t * task);
 void anscheduler_cpu_set_thread(thread_t * thread);
 
-void anscheduler_cpu_notify_invlpg(task_t * task, uint64_t page);
+void anscheduler_cpu_notify_invlpg(task_t * task);
 void anscheduler_cpu_notify_dead(task_t * task);
 
 /**

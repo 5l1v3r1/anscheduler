@@ -90,6 +90,30 @@ uint64_t anscheduler_thread_poll(uint64_t flags) {
   return 0;
 }
 
+void anscheduler_thread_exit() {
+  anscheduler_cpu_lock();
+  task_t * task = anscheduler_cpu_get_task();
+  thread_t * thread = anscheduler_cpu_get_thread();
+  anscheduler_cpu_unlock();
+  
+  anscheduler_thread_dealloc(task, thread);
+  
+  // TODO: here, launch a kernel thread which unlinks this thread and puts
+  // the stack index back into the queue.
+}
+
+void anscheduler_thread_dealloc(task_t * task, thread_t * thread) {
+  // this shouldn't be so hard, just unmap everything important
+  // and then go back and free everything.
+}
+
+void * anscheduler_thread_kernel_stack(task_t * task, thread_t * thread) {
+  uint64_t vPage = ANSCHEDULER_TASK_KERN_STACKS_PAGE + thread->stack;
+  anscheduler_lock(&task->vmLock);
+  
+  anscheduler_unlock(&task->vmLock);
+}
+
 bool _alloc_kernel_stack(task_t * task, thread_t * thread) {
   // allocate the kernel stack
   void * buffer = anscheduler_alloc(0x1000);
@@ -119,9 +143,10 @@ bool _map_user_stack(task_t * task, thread_t * thread) {
   uint64_t start = ANSCHEDULER_TASK_USER_STACKS_PAGE + (thread->stack << 8);
   
   uint64_t i;
+  anscheduler_lock(&task->vmLock);
+  
   for (i = 0; i < 0x100; i++) {
     uint64_t page = i + start;
-    anscheduler_lock(&task->vmLock);
     if (!anscheduler_vm_map(task->vm, page, 0, flags)) {
       // unmap all that we have mapped so far
       uint64_t j = 0;
@@ -132,9 +157,9 @@ bool _map_user_stack(task_t * task, thread_t * thread) {
       anscheduler_unlock(&task->vmLock);
       return false;
     }
-    anscheduler_unlock(&task->vmLock);
   }
   
+  anscheduler_unlock(&task->vmLock);
   return true;
 }
 

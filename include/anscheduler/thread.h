@@ -25,7 +25,10 @@ void anscheduler_thread_add(task_t * task, thread_t * thread);
  * event has been received and masked already, the mask is returned and the
  * thread is not paused. Otherwise, zero is returned and the thread is set to
  * the 'polling' state.
- * @discussion You should probably run the task loop after calling this.
+ * @discussion You should save the state of the thread and switch to a CPU
+ * stack before calling this.  However, if this doesn't return a mask of 0,
+ * feel more than free to jump right back into the thread. Otherwise, just run
+ * the run loop.
  * @critical
  */
 uint64_t anscheduler_thread_poll(uint64_t flags);
@@ -38,10 +41,17 @@ uint64_t anscheduler_thread_poll(uint64_t flags);
 void anscheduler_thread_exit();
 
 /**
- * Deallocates a thread's kernel and user stack, locking the CPU when needed.
+ * Deallocates a thread's user stack, locking the CPU when needed.
  * @noncritical This function can be interrupted or terminated at any time;
  * no memory will be leaked if proper cleanup is done later.
  */
 void anscheduler_thread_deallocate(task_t * task, thread_t * thread);
+
+/**
+ * Returns the beginning of the kernel stack for a given thread or NULL if one
+ * is not mapped.
+ * @critical
+ */
+void * anscheduler_thread_kernel_stack(task_t * task, thread_t * thread);
 
 #endif
