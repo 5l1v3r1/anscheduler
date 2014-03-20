@@ -4,6 +4,11 @@
 #include <anscheduler/thread.h> // for deallocation
 #include "util.h" // for idxset
 
+static task_t * pidHashmap[0x100];
+static anidxset_root_t pidPool;
+static bool pidPoolInitialized = 0;
+static uint64_t pidLock = 0;
+
 /**
  * @critical
  */
@@ -41,6 +46,24 @@ static void _free_task_method(task_t * task);
  */
 static void _dealloc_task_code_async(task_t * task);
 
+/**
+ * Returns the hash of a PID for the PID hashmap. Can be called from either
+ * a critical or a non-critical section, for now.
+ */
+static uint8_t _pid_hash(uint64_t pid);
+
+/**
+ * Get the next available PID.
+ * @critical
+ */
+static uint64_t _pid_next();
+
+/**
+ * Stop using a process identifier.
+ * @critical
+ */
+static void _pid_release(uint64_t aPid);
+
 /******************
  * Implementation *
  ******************/
@@ -51,13 +74,27 @@ task_t * anscheduler_task_create(void * code, uint64_t len) {
     return NULL;
   }
   
-  if (!_copy_task_code(task, code, len)) {
+  task->codeRetainCount = anscheduler_alloc(sizeof(uint64_t));
+  if (!task->codeRetainCount) {
+    _pid_release(task->pid);
     anidxset_free(&task->descriptors);
     anidxset_free(&task->stacks);
     anscheduler_vm_root_free(task->vm);
     anscheduler_free(task);
     return NULL;
   }
+  
+  if (!_copy_task_code(task, code, len)) {
+    anscheduler_free(task->codeRetainCount);
+    _pid_release(task->pid);
+    anidxset_free(&task->descriptors);
+    anidxset_free(&task->stacks);
+    anscheduler_vm_root_free(task->vm);
+    anscheduler_free(task);
+    return NULL;
+  }
+  
+  (*task->codeRetainCount) = 1;
   
   return task;
 }
@@ -87,6 +124,7 @@ task_t * anscheduler_task_fork(task_t * aTask) {
       anscheduler_unlock(&task->vmLock);
       
       // it failed
+      _pid_release(task->pid);
       anidxset_free(&task->descriptors);
       anidxset_free(&task->stacks);
       anscheduler_vm_root_free(task->vm);
@@ -134,6 +172,10 @@ void anscheduler_task_dereference(task_t * task) {
   anscheduler_unlock(&task->killLock);
 }
 
+task_t * anscheduler_task_for_pid(uint64_t pid) {
+  return NULL;
+}
+
 /******************
  * Helper Methods *
  ******************/
@@ -170,6 +212,7 @@ static task_t * _create_bare_task() {
     return NULL;
   }
   
+  task->pid = _pid_next();
   return task;
 }
 
@@ -286,6 +329,9 @@ static void _free_task_method(task_t * task) {
     anscheduler_cpu_unlock();
   }
   
+  anscheduler_free(task);
+  _pid_release(task->pid);
+  
   // TODO: close sockets here, once they are implemented and I understand
   // how they will work better.
   
@@ -312,4 +358,32 @@ static void _dealloc_task_code_async(task_t * task) {
     
     anscheduler_cpu_unlock();
   }
+}
+
+static uint8_t _pid_hash(uint64_t pid) {
+  return (uint8_t)(pid & 0xff);
+}
+
+static uint64_t _pid_next() {
+  anscheduler_lock(&pidLock);
+  if (!pidPoolInitialized) {
+    if (!anscheduler_idxset_init(&pidPool)) {
+      anscheduler_abort("failed to initialize PID pool");
+      return 0;
+    }
+    pidPoolInitialized = true;
+  }
+  uint64_t nextPid = anidxset_get(&pidPool);
+  anscheduler_unlock(&pidLock);
+  return nextPid;
+}
+
+static void _pid_release(uint64_t aPid) {
+  anscheduler_lock(&pidLock);
+  if (!pidPoolInitialized) {
+    anscheduler_abort("cannot release a PID that was never allocated");
+    return;
+  }
+  anidxset_put(&pidPool, aPid);
+  anscheduler_unlock(&pidLock);
 }

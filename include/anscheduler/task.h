@@ -61,4 +61,12 @@ bool anscheduler_task_reference(task_t * task);
  */
 void anscheduler_task_dereference(task_t * task);
 
+/**
+ * Finds a launched task with a specified PID. The returned task is
+ * referenced, so you must dereference it yourself.
+ * @critical With many tasks, this may take some time, despite the fact that
+ * a PID hashmap is used.
+ */
+task_t * anscheduler_task_for_pid(uint64_t pid);
+
 #endif
