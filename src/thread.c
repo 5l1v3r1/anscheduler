@@ -96,22 +96,72 @@ void anscheduler_thread_exit() {
   thread_t * thread = anscheduler_cpu_get_thread();
   anscheduler_cpu_unlock();
   
-  anscheduler_thread_dealloc(task, thread);
+  anscheduler_thread_deallocate(task, thread);
   
   // TODO: here, launch a kernel thread which unlinks this thread and puts
   // the stack index back into the queue.
 }
 
-void anscheduler_thread_dealloc(task_t * task, thread_t * thread) {
-  // this shouldn't be so hard, just unmap everything important
-  // and then go back and free everything.
+void anscheduler_thread_deallocate(task_t * task, thread_t * thread) {
+  uint64_t i;
+  uint64_t firstPage = ANSCHEDULER_TASK_USER_STACKS_PAGE
+    + (thread->stack << 8);
+  
+  // unmap all the memory
+  for (i = 0; i < 0x100; i++) {
+    uint64_t page = firstPage + i;
+    anscheduler_cpu_lock();
+    anscheduler_lock(&task->vmLock);
+    uint16_t flags;
+    uint64_t phyPage = anscheduler_vm_lookup(task->vm, page, &flags);
+    if (flags & ANSCHEDULER_PAGE_FLAG_PRESENT) {
+      flags ^= ANSCHEDULER_PAGE_FLAG_PRESENT;
+      flags |= ANSCHEDULER_PAGE_FLAG_UNALLOC;
+      // if UNALLOC is set but page != 0, then it needs to be free'd next
+      anscheduler_vm_map(task->vm, page, phyPage, flags);
+    } else if (flags && !page) {
+      // the memory was never allocated to begin with
+      anscheduler_vm_unmap(task->vm, page);
+    }
+    anscheduler_unlock(&task->vmLock);
+    anscheduler_cpu_unlock();
+  }
+  
+  // make sure no running instance will be able to access the memory anymore
+  anscheduler_cpu_lock();
+  anscheduler_cpu_notify_invlpg(task);
+  anscheduler_cpu_unlock();
+  
+  // free all the memory
+  for (i = 0; i < 0x100; i++) {
+    uint64_t page = firstPage + i;
+    anscheduler_cpu_lock();
+    anscheduler_lock(&task->vmLock);
+    uint16_t flags;
+    uint64_t phyPage = anscheduler_vm_lookup(task->vm, page, &flags);
+    if (phyPage || flags) {
+      anscheduler_vm_unmap(task->vm, page);
+    }
+    anscheduler_unlock(&task->vmLock);
+    if (phyPage && (flags & ANSCHEDULER_PAGE_FLAG_UNALLOC)) {
+      uint64_t virPage = anscheduler_vm_virtual(phyPage);
+      anscheduler_free((void *)(virPage << 12));
+    }
+    anscheduler_cpu_unlock();
+  }
 }
 
 void * anscheduler_thread_kernel_stack(task_t * task, thread_t * thread) {
   uint64_t vPage = ANSCHEDULER_TASK_KERN_STACKS_PAGE + thread->stack;
   anscheduler_lock(&task->vmLock);
-  
+  uint16_t flags;
+  uint64_t entry = anscheduler_vm_lookup(task->vm, vPage, &flags);
   anscheduler_unlock(&task->vmLock);
+  
+  if (flags & ANSCHEDULER_PAGE_FLAG_PRESENT) {
+    return (void *)(anscheduler_vm_virtual(entry) << 12);
+  }
+  return NULL;
 }
 
 bool _alloc_kernel_stack(task_t * task, thread_t * thread) {
