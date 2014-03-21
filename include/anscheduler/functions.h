@@ -45,6 +45,18 @@ void anscheduler_inc(uint64_t * ptr);
  */
 void anscheduler_thread_run(task_t * task, thread_t * thread);
 
+/**
+ * Configures a thread to run a kernel job in the kernel's address space.
+ * @param thread The thread whose state to configure.
+ * @param stack The stack which the thread should run under
+ * @param ip A pointer to the code to be executed.
+ * @param arg The first pointer argument to pass to the function.
+ */
+void anscheduler_set_state(thread_t * thread,
+                           void * stack,
+                           void * ip,
+                           void * arg1);
+
 /*********
  * Timer *
  *********/

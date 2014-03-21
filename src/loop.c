@@ -9,11 +9,12 @@ static thread_t * lastThread = NULL;
 
 static thread_t * _next_thread(uint64_t * nextTick);
 static void _push_unconditional(thread_t * thread);
+static void _delete_cur_kernel(void * unused);
 
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
   task_t * task = anscheduler_cpu_get_task();
-  anscheduler_cpu_set_task(NULL);
+  if (task) anscheduler_cpu_set_task(NULL);
   anscheduler_cpu_set_thread(NULL);
   
   anscheduler_loop_push(thread);
@@ -91,6 +92,32 @@ void anscheduler_loop_run() {
   anscheduler_thread_run(thread->task, thread);
 }
 
+void anscheduler_loop_push_kernel(void * arg, void (* fn)(void * arg)) {
+  thread_t * thread = anscheduler_alloc(sizeof(thread_t));
+  if (!thread) {
+    anscheduler_abort("Failed to allocate kernel thread");
+    return;
+  }
+  void * stack = anscheduler_alloc(0x1000);
+  if (!stack) {
+    anscheduler_free(thread);
+    anscheduler_abort("Failed to allocate kernel thread stack.");
+    return;
+  }
+  anscheduler_zero(thread, sizeof(thread_t));
+  thread->stack = (uint64_t)stack;
+  anscheduler_set_state(thread, stack, fn, arg);
+  anscheduler_loop_push(thread);
+}
+
+void anscheduler_loop_delete_cur_kernel() {
+  anscheduler_cpu_stack_run(NULL, _delete_cur_kernel);
+}
+
+void anscheduler_loop_switch(task_t * task, thread_t * thread) {
+  
+}
+
 static thread_t * _next_thread(uint64_t * nextTick) {
   anscheduler_lock(&loopLock);
   uint64_t i, max = queueCount;
@@ -130,4 +157,14 @@ static void _push_unconditional(thread_t * thread) {
     lastThread = (firstThread = thread);
     thread->queueNext = (thread->queueLast = NULL);
   }
+}
+
+static void _delete_cur_kernel(void * unused) {
+  thread_t * thread = anscheduler_cpu_get_thread();
+  task_t * task = anscheduler_cpu_get_task();
+  if (task) anscheduler_abort("_delete_cur_kernel in non-kernel thread!");
+  anscheduler_cpu_set_thread(NULL);
+  anscheduler_free((void *)thread->stack);
+  anscheduler_free(thread);
+  anscheduler_loop_run();
 }

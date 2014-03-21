@@ -50,8 +50,8 @@ void anscheduler_loop_delete_cur_kernel();
 
 /**
  * Switches from this thread to a different thread.  In order to call this
- * method, you must have already set isPolling back to 0 so that no other task
- * will attempt to switch into this one.
+ * method, you must have already set isPolling back to 0 in the new thtread
+ * so that no other task will attempt to switch into it.
  * @param task A referenced task
  * @param thread The thread in the task
  * @critical
