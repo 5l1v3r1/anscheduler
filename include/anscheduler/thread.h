@@ -13,9 +13,10 @@
 thread_t * anscheduler_thread_create(task_t * task);
 
 /**
- * Adds a thread to a task.
+ * Adds a thread to a task. This will schedule the thread, so make sure the
+ * task has already been launched when you call this.
  * @param task A referenced task.
- * @param thread The thread te queue and begin executing.
+ * @param thread The thread to queue and begin executing.
  * @critical
  */
 void anscheduler_thread_add(task_t * task, thread_t * thread);

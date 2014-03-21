@@ -2,13 +2,6 @@
 #define __ANSCHEDULER_LOOP_H__
 
 /**
- * Initialize the scheduling loop. This will allocate various structures for
- * the task queue.
- * @critical
- */
-void anscheduler_loop_initialize();
-
-/**
  * Pushes the current thread back to the run loop for another time. This must
  * be called before running anscheduler_loop_run() function. However,
  * anscheduler_loop_switch() calls this automatically.

@@ -288,7 +288,9 @@ static void _dealloc_task_code(task_t * task, uint64_t pageCount) {
 
 static void _generate_kill_job(task_t * task) {
   // Note: By the time we get here, we know nothing is running our task and
-  // nothing will ever run it again.
+  // nothing will ever run it again.  The loop may attempt to reference
+  // threads that miraculously made it back into the queue, but these will
+  // fail because the task has been killed.
   
   // Remove the task's threads from the queue. There is no need to lock the
   // threads lock anymore, because nothing could possibly be doing anything

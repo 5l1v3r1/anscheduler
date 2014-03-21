@@ -71,12 +71,9 @@ task_t * anscheduler_pidmap_get(uint64_t pid) {
   task_t * task = pidHashmap[hash];
   while (task) {
     if (task->pid == pid) {
-      task_t * result = task;
-      if (!anscheduler_task_reference(task)) {
-        result = NULL;
-      }
+      bool result = anscheduler_task_reference(task);
       anscheduler_unlock(&pmLock);
-      return result;
+      return result ? task : NULL;
     }
     task = task->next;
   }
