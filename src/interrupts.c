@@ -1,5 +1,6 @@
 #include <anscheduler/interrupts.h>
 #include <anscheduler/loop.h>
+#include <anscheduler/task.h>
 #include <anscheduler/functions.h>
 
 static thread_t * interruptThread = NULL;

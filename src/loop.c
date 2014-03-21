@@ -172,7 +172,7 @@ static void _delete_cur_kernel(void * unused) {
 
 static void _switch_to_thread(thread_t * thread) {
   anscheduler_loop_push_cur();
-  anscheduler_cpu_set_task(task);
+  anscheduler_cpu_set_task(thread->task);
   anscheduler_cpu_set_thread(thread);
   anscheduler_thread_run(thread->task, thread);
 }
