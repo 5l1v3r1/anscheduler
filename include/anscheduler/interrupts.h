@@ -1,3 +1,6 @@
+#ifndef __ANSCHEDULER_INTERRUPTS_H__
+#define __ANSCHEDULER_INTERRUPTS_H__
+
 #include "types.h"
 
 #define ANSCHEDULER_PAGE_FAULT_PRESENT 1
@@ -19,3 +22,21 @@ void anscheduler_page_fault(void * ptr, uint64_t flags);
  * Call this whenever an external IRQ comes in.
  */
 void anscheduler_irq(uint8_t irqNumber);
+
+/**
+ * @return The current thread which is registered to receive interrupts.
+ */
+thread_t * anscheduler_interrupt_thread();
+
+/**
+ * Set the current thread which will receive interrupts.
+ */
+void anscheduler_set_interrupt_thread(thread_t * thread);
+
+/**
+ * If the passed thread is the current interrupt thread, set the interrupt
+ * thread to NULL. This should be called whenever a thread dies.
+ */
+void anscheduler_interrupt_thread_cmpnull(thread_t * thread);
+
+#endif

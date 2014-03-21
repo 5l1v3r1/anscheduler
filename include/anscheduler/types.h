@@ -30,6 +30,10 @@ struct task_t {
   uint64_t socketsLock;
   socket_link_t * firstSocket;
   
+  // list of sockets with pending messages
+  uint64_t pendingLock;
+  socket_link_t * firstPending;
+  
   // list of threads in this task
   uint64_t threadsLock;
   thread_t * firstThread;
@@ -55,10 +59,9 @@ struct thread_t {
   uint64_t nextTimestamp;
   uint64_t stack;
   
-  uint64_t interestsLock; // applies to the following 3 flags
-  uint64_t interests; // (1 << n) masked for each IRQ# and 2^63 for socket
-  uint64_t pending; // interests pending
-  uint64_t isPolling; // 1 if waiting for an interest
+  bool isPolling; // 1 if waiting for a message (or an interrupt)
+  char reserved[3]; // for alignment
+  uint32_t irqs; // if this is the interrupt thread, these will be masked
   
   anscheduler_state state;
 } __attribute__((packed));
@@ -67,11 +70,13 @@ struct socket_t {
   task_t * connector, * receiver;
   
   uint64_t msgsLock;
-  socket_msg_t * firstMsg;
+  socket_msg_t * forConnector;
+  socket_msg_t * forReceiver;
 } __attribute__((packed));
 
 struct socket_link_t {
   socket_link_t * next, * last;
+  socket_link_t * pendingNext, * pendingLast;
   socket_t * socket;
   uint64_t descriptor;
 } __attribute__((packed));

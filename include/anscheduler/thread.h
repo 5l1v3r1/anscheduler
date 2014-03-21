@@ -22,17 +22,14 @@ thread_t * anscheduler_thread_create(task_t * task);
 void anscheduler_thread_add(task_t * task, thread_t * thread);
 
 /**
- * Sets the current thread as 'polling' for events matching `flags`. If an
- * event has been received and masked already, the mask is returned and the
- * thread is not paused. Otherwise, zero is returned and the thread is set to
- * the 'polling' state.
+ * Set the thread to listen for events from sockets. If an event has already
+ * been received, false is returned. Otherwise, true is returned.
  * @discussion You should save the state of the thread and switch to a CPU
- * stack before calling this.  However, if this doesn't return a mask of 0,
- * feel more than free to jump right back into the thread. Otherwise, just run
- * the run loop.
+ * stack before calling this.  However, if this doesn't return true, you may
+ * jump right back into the thread in question.
  * @critical
  */
-uint64_t anscheduler_thread_poll(uint64_t flags);
+bool anscheduler_thread_poll();
 
 /**
  * Call this to exit the current thread, presumably in a syscall handler.

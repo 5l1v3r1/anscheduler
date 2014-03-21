@@ -8,10 +8,9 @@
  * be called before running anscheduler_loop_run() function. However,
  * anscheduler_loop_switch() calls this automatically.
  *
- * @discussion If you are calling this, you must be sure that you have
- * already switched to a CPU-specific kernel stack that is not associated
- * with the thread; otherwise, the next CPU running the thread could smash
- * our stack.
+ * @discussion If you are calling this, you must be sure that you have already
+ * switched to a CPU-specific kernel stack that is not associated  with the
+ * thread; otherwise, the next CPU running the thread could smash our stack.
  *
  * @critical
  */
@@ -29,7 +28,8 @@ void anscheduler_loop_delete(thread_t * thread);
 void anscheduler_loop_push(thread_t * newThread);
 
 /**
- * Enters the scheduling loop.  This function should never return.
+ * Enters the scheduling loop.  This function should never return.  By this
+ * point, you should be on the CPU dedicated stack.
  * @critical
  */
 void anscheduler_loop_run();
@@ -50,8 +50,9 @@ void anscheduler_loop_delete_cur_kernel();
 
 /**
  * Switches from this thread to a different thread.  In order to call this
- * method, you must have already set isPolling back to 0 in the new thtread
- * so that no other task will attempt to switch into it.
+ * method, you must have already set isPolling back to 0 in the new thtread so
+ * that no other task will attempt to switch into it.
+ * This method switches to the CPU dedicated stack for you.
  * @param task A referenced task
  * @param thread The thread in the task
  * @critical

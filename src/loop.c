@@ -115,8 +115,9 @@ void anscheduler_loop_delete_cur_kernel() {
 }
 
 void anscheduler_loop_switch(task_t * task, thread_t * thread) {
+  // TODO: switch to the CPU dedicated stack first!
   anscheduler_loop_push_cur();
-  anscheduler_cpu_set_task(thread->task);
+  anscheduler_cpu_set_task(task);
   anscheduler_cpu_set_thread(thread);
   anscheduler_thread_run(thread->task, thread);
 }

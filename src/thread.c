@@ -2,6 +2,7 @@
 #include <anscheduler/task.h>
 #include <anscheduler/functions.h>
 #include <anscheduler/loop.h>
+#include <anscheduler/interrupts.h>
 
 /**
  * @critical
@@ -81,21 +82,16 @@ void anscheduler_thread_add(task_t * task, thread_t * thread) {
   anscheduler_loop_push(thread);
 }
 
-uint64_t anscheduler_thread_poll(uint64_t flags) {
+bool anscheduler_thread_poll() {
   thread_t * thread = anscheduler_cpu_get_thread();
+  task_t * task = anscheduler_cpu_get_task();
   
-  anscheduler_lock(&thread->interestsLock);
-  if (thread->pending & flags) {
-    uint64_t pending = thread->pending & flags;
-    thread->pending ^= pending;
-    anscheduler_unlock(&thread->interestsLock);
-    return pending;
-  }
-  thread->interests = flags;
-  thread->isPolling = true;
-  anscheduler_unlock(&thread->interestsLock);
+  anscheduler_lock(&task->pendingLock);
+  bool hadJobs = task->firstPending != NULL;
+  if (!hadJobs) thread->isPolling = 1;
+  anscheduler_unlock(&task->pendingLock);
   
-  return 0;
+  return !hadJobs;
 }
 
 void anscheduler_thread_exit() {
@@ -107,6 +103,7 @@ void anscheduler_thread_exit() {
   anscheduler_thread_deallocate(task, thread);
   
   anscheduler_cpu_lock();
+  // TODO: here, we need to switch to the CPU dedicated stack.
   anscheduler_loop_push_kernel(thread,
                                (void (*)(void *))_finish_thread_dealloc);
   
@@ -117,6 +114,10 @@ void anscheduler_thread_exit() {
 }
 
 void anscheduler_thread_deallocate(task_t * task, thread_t * thread) {
+  anscheduler_cpu_lock();
+  anscheduler_interrupt_thread_cmpnull(thread);
+  anscheduler_cpu_unlock();
+  
   uint64_t i;
   uint64_t firstPage = ANSCHEDULER_TASK_USER_STACKS_PAGE
     + (thread->stack << 8);
