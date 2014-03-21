@@ -251,18 +251,18 @@ static bool _copy_task_code(task_t * task, void * ptr, uint64_t len) {
     }
     
     // copy the data
-    uint16_t i;
+    uint16_t j;
     if (i != pageCount - 1 || (len & 0xfff) == 0) {
       uint64_t * bytes = (uint64_t *)buff;
       uint64_t * source = (uint64_t *)(ptr + (i << 12));
-      for (i = 0; i < 0x200; i++) {
-        bytes[i] = source[i];
+      for (j = 0; j < 0x200; j++) {
+        bytes[j] = source[j];
       }
     } else {
       uint8_t * bytes = (uint8_t *)buff;
       uint8_t * source = (uint8_t *)(ptr + (i << 12));
-      for (i = 0; i < (len & 0xfff); i++) {
-        bytes[i] = source[i];
+      for (j = 0; j < (len & 0xfff); j++) {
+        bytes[j] = source[j];
       }
     }
   }
