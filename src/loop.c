@@ -3,8 +3,12 @@
 #include <anscheduler/task.h>
 
 static uint64_t loopLock = 0;
+static uint64_t queueCount = 0;
 static thread_t * firstThread = NULL;
 static thread_t * lastThread = NULL;
+
+static thread_t * _next_thread(uint64_t * nextTick);
+static void _push_unconditional(thread_t * thread);
 
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
@@ -44,6 +48,8 @@ void anscheduler_loop_delete(thread_t * thread) {
     thread->queueNext->queueLast = thread->queueLast;
   }
   
+  queueCount--;
+  
   anscheduler_unlock(&loopLock);
 }
 
@@ -68,5 +74,60 @@ void anscheduler_loop_push(thread_t * thread) {
     firstThread = (lastThread = thread);
     thread->queueNext = (thread->queueLast = NULL);
   }
+  queueCount++;
   anscheduler_unlock(&loopLock);
+}
+
+void anscheduler_loop_run() {
+  uint64_t nextTick = 0;
+  thread_t * thread = _next_thread(&nextTick);
+  anscheduler_timer_set(nextTick);
+  if (!thread) {
+    anscheduler_cpu_unlock();
+    while (1) anscheduler_cpu_halt();
+  }
+  anscheduler_cpu_set_task(thread->task);
+  anscheduler_cpu_set_thread(thread);
+  anscheduler_thread_run(thread->task, thread);
+}
+
+static thread_t * _next_thread(uint64_t * nextTick) {
+  anscheduler_lock(&loopLock);
+  uint64_t i, max = queueCount;
+  (*nextTick) = anscheduler_get_time() + (anscheduler_second_length() >> 5);
+  for (i = 0; i < max; i++) {
+    thread_t * th = firstThread;
+    firstThread = th->queueNext;
+    if (th->nextTimestamp > anscheduler_get_time()) {
+      _push_unconditional(th);
+      if (th->nextTimestamp < *nextTick) {
+        (*nextTick) = th->nextTimestamp;
+      }
+      continue;
+    }
+    
+    queueCount--;
+    if (th->task) {
+      if (!anscheduler_task_reference(th->task)) {
+        continue;
+      }
+    }
+    anscheduler_unlock(&loopLock);
+    return th;
+  }
+  
+  anscheduler_unlock(&loopLock);
+  return NULL;
+}
+
+static void _push_unconditional(thread_t * thread) {
+  if (lastThread) {
+    lastThread->queueNext = thread;
+    thread->queueLast = lastThread;
+    thread->queueNext = NULL;
+    lastThread = thread;
+  } else {
+    lastThread = (firstThread = thread);
+    thread->queueNext = (thread->queueLast = NULL);
+  }
 }
