@@ -20,12 +20,11 @@ bool _map_user_stack(task_t * task, thread_t * thread);
 void _dealloc_kernel_stack(task_t * task, thread_t * thread);
 
 /**
- * @param thread The thread to remove from the task. Make sure the thread's
- * task has an extra reference so that it cannot be killed while being
- * unlinked.
- * @noncritical Run in a kernel thread.
+ * Call from the CPU dedicated stack while the CPU is registered as running
+ * the task which the thread belongs to.
+ * @critical
  */
-void _finish_thread_dealloc(thread_t * thread);
+void _finalize_thread_exit(thread_t * thread);
 
 thread_t * anscheduler_create_thread(task_t * task) {
   thread_t * thread = anscheduler_alloc(sizeof(thread_t));
@@ -102,15 +101,10 @@ void anscheduler_thread_exit() {
   
   anscheduler_thread_deallocate(task, thread);
   
+  // jump to the CPU stack in order to schedule another task and push a
+  // kernel thread for the final dealloc stages.
   anscheduler_cpu_lock();
-  // TODO: here, we need to switch to the CPU dedicated stack.
-  anscheduler_loop_push_kernel(thread,
-                               (void (*)(void *))_finish_thread_dealloc);
-  
-  // Running the loop without a push means this thread will never be executed
-  // again; just what we want. Additionally, doing this will leave the task
-  // referenced, so that our kernel thread won't get screwed over.
-  anscheduler_loop_run();
+  anscheduler_cpu_stack_run(thread, (void (*)(void *))_finalize_thread_exit);
 }
 
 void anscheduler_thread_deallocate(task_t * task, thread_t * thread) {
@@ -245,9 +239,12 @@ void _dealloc_kernel_stack(task_t * task, thread_t * thread) {
   }
 }
 
-void _finish_thread_dealloc(thread_t * thread) {
+void _finalize_thread_exit(thread_t * thread) {
+  anscheduler_cpu_set_task(NULL);
+  anscheduler_cpu_set_thread(NULL);
+  
   task_t * task = thread->task;
-  anscheduler_cpu_lock();
+  
   // unlink the thread
   anscheduler_lock(&task->threadsLock);
   if (!thread->last) {
@@ -265,6 +262,8 @@ void _finish_thread_dealloc(thread_t * thread) {
   
   anscheduler_task_dereference(task);
   
-  // now, we do not want to keep running this kernel thread
-  anscheduler_loop_delete_cur_kernel();
+  // Running the loop without a push means this thread will never be executed
+  // again; just what we want. Additionally, doing this will leave the task
+  // referenced, so that our kernel thread won't get screwed over.
+  anscheduler_loop_run();
 }

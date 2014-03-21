@@ -10,6 +10,7 @@ static thread_t * lastThread = NULL;
 static thread_t * _next_thread(uint64_t * nextTick);
 static void _push_unconditional(thread_t * thread);
 static void _delete_cur_kernel(void * unused);
+static void _switch_to_thread(thread_t * thread);
 
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
@@ -115,11 +116,7 @@ void anscheduler_loop_delete_cur_kernel() {
 }
 
 void anscheduler_loop_switch(task_t * task, thread_t * thread) {
-  // TODO: switch to the CPU dedicated stack first!
-  anscheduler_loop_push_cur();
-  anscheduler_cpu_set_task(task);
-  anscheduler_cpu_set_thread(thread);
-  anscheduler_thread_run(thread->task, thread);
+  anscheduler_cpu_stack_run(thread, (void (*)(void *))_switch_to_thread);
 }
 
 static thread_t * _next_thread(uint64_t * nextTick) {
@@ -171,4 +168,11 @@ static void _delete_cur_kernel(void * unused) {
   anscheduler_free((void *)thread->stack);
   anscheduler_free(thread);
   anscheduler_loop_run();
+}
+
+static void _switch_to_thread(thread_t * thread) {
+  anscheduler_loop_push_cur();
+  anscheduler_cpu_set_task(task);
+  anscheduler_cpu_set_thread(thread);
+  anscheduler_thread_run(thread->task, thread);
 }
