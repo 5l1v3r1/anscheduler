@@ -64,6 +64,16 @@ static uint64_t _pid_next();
  */
 static void _pid_release(uint64_t aPid);
 
+/**
+ * @critical O(1)
+ */
+static void _pid_map_set(task_t * task);
+
+/**
+ * @critical O(1)
+ */
+static void _pid_map_unset(task_t * task);
+
 /******************
  * Implementation *
  ******************/
