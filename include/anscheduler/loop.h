@@ -1,6 +1,8 @@
 #ifndef __ANSCHEDULER_LOOP_H__
 #define __ANSCHEDULER_LOOP_H__
 
+#include "types.h"
+
 /**
  * Pushes the current thread back to the run loop for another time. This must
  * be called before running anscheduler_loop_run() function. However,
