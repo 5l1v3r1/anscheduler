@@ -1,13 +1,16 @@
 #include "pidmap.h"
+#include "util.h"
 #include <anscheduler/functions.h>
+#include <anscheduler/task.h>
 
 static uint64_t pmLock = 0;
-static bool pmInitialized = 0;
 static task_t * pidHashmap[0x100];
 
 static uint64_t ppLock = 0;
 static anidxset_root_t pidPool;
 static bool ppInitialized = 0;
+
+static uint8_t _hash_pid(uint64_t pid);
 
 uint64_t anscheduler_pidmap_alloc_pid() {
   anscheduler_lock(&ppLock);
@@ -27,17 +30,60 @@ void anscheduler_pidmap_free_pid(uint64_t pid) {
   if (!ppInitialized) {
     anscheduler_abort("cannot free PID when not initialized");
   }
+  anidxset_put(&pidPool, pid);
   anscheduler_unlock(&ppLock);
 }
 
-void anschedulrer_pidmap_set(task_t * task) {
-  
+void anscheduler_pidmap_set(task_t * task) {
+  anscheduler_lock(&pmLock);
+  uint8_t hash = _hash_pid(task->pid);
+  if (!pidHashmap[hash]) {
+    pidHashmap[hash] = task;
+    task->next = NULL;
+    task->last = NULL;
+  } else {
+    task->next = pidHashmap[hash];
+    task->last = NULL;
+    pidHashmap[hash] = task;
+  }
+  anscheduler_unlock(&pmLock);
 }
 
-void anschedulrer_pidmap_unset(task_t * task) {
-  
+void anscheduler_pidmap_unset(task_t * task) {
+  anscheduler_lock(&pmLock);
+  if (!task->last) {
+    uint8_t hash = _hash_pid(task->pid);
+    pidHashmap[hash] = task->next;
+  } else {
+    task->last->next = task->next;
+  }
+  if (task->next) {
+    task->next->last = task->last;
+  }
+  task->next = NULL;
+  task->last = NULL;
+  anscheduler_unlock(&pmLock);
 }
 
-task_t anschedulrer_pidmap_get(uint64_t pid) {
-  
+task_t * anscheduler_pidmap_get(uint64_t pid) {
+  anscheduler_lock(&pmLock);
+  uint8_t hash = _hash_pid(pid);
+  task_t * task = pidHashmap[hash];
+  while (task) {
+    if (task->pid == pid) {
+      task_t * result = task;
+      if (!anscheduler_task_reference(task)) {
+        result = NULL;
+      }
+      anscheduler_unlock(&pmLock);
+      return result;
+    }
+    task = task->next;
+  }
+  anscheduler_unlock(&pmLock);
+  return NULL;
+}
+
+static uint8_t _hash_pid(uint64_t pid) {
+  return (uint8_t)(pid & 0xff);
 }

@@ -3,11 +3,7 @@
 #include <anscheduler/loop.h> // for kernel threads
 #include <anscheduler/thread.h> // for deallocation
 #include "util.h" // for idxset
-
-static task_t * pidHashmap[0x100];
-static anidxset_root_t pidPool;
-static bool pidPoolInitialized = 0;
-static uint64_t pidLock = 0;
+#include "pidmap.h"
 
 /**
  * @critical
@@ -46,34 +42,6 @@ static void _free_task_method(task_t * task);
  */
 static void _dealloc_task_code_async(task_t * task);
 
-/**
- * Returns the hash of a PID for the PID hashmap. Can be called from either
- * a critical or a non-critical section, for now.
- */
-static uint8_t _pid_hash(uint64_t pid);
-
-/**
- * Get the next available PID.
- * @critical
- */
-static uint64_t _pid_next();
-
-/**
- * Stop using a process identifier.
- * @critical
- */
-static void _pid_release(uint64_t aPid);
-
-/**
- * @critical O(1)
- */
-static void _pid_map_set(task_t * task);
-
-/**
- * @critical O(1)
- */
-static void _pid_map_unset(task_t * task);
-
 /******************
  * Implementation *
  ******************/
@@ -86,7 +54,7 @@ task_t * anscheduler_task_create(void * code, uint64_t len) {
   
   task->codeRetainCount = anscheduler_alloc(sizeof(uint64_t));
   if (!task->codeRetainCount) {
-    _pid_release(task->pid);
+    anscheduler_pidmap_free_pid(task->pid);
     anidxset_free(&task->descriptors);
     anidxset_free(&task->stacks);
     anscheduler_vm_root_free(task->vm);
@@ -96,7 +64,7 @@ task_t * anscheduler_task_create(void * code, uint64_t len) {
   
   if (!_copy_task_code(task, code, len)) {
     anscheduler_free(task->codeRetainCount);
-    _pid_release(task->pid);
+    anscheduler_pidmap_free_pid(task->pid);
     anidxset_free(&task->descriptors);
     anidxset_free(&task->stacks);
     anscheduler_vm_root_free(task->vm);
@@ -134,7 +102,7 @@ task_t * anscheduler_task_fork(task_t * aTask) {
       anscheduler_unlock(&task->vmLock);
       
       // it failed
-      _pid_release(task->pid);
+      anscheduler_pidmap_free_pid(task->pid);
       anidxset_free(&task->descriptors);
       anidxset_free(&task->stacks);
       anscheduler_vm_root_free(task->vm);
@@ -148,9 +116,29 @@ task_t * anscheduler_task_fork(task_t * aTask) {
   return task;
 }
 
+void anscheduler_task_launch(task_t * task) {
+  anscheduler_task_reference(task);
+  
+  // add it to the PID list
+  anscheduler_pidmap_set(task);
+  
+  anscheduler_lock(&task->threadsLock);
+  thread_t * thread = task->firstThread;
+  while (thread) {
+    anscheduler_loop_push(thread);
+    thread = thread->next;
+  }
+  anscheduler_unlock(&task->threadsLock);
+  anscheduler_task_dereference(task);
+}
+
 void anscheduler_task_kill(task_t * task) {
   // emulate a test-and-or operation
   anscheduler_lock(&task->killLock);
+  if (task->isKilled) {
+    anscheduler_unlock(&task->killLock);
+    return;
+  }
   task->isKilled = true;
   uint64_t ref = task->refCount;
   anscheduler_unlock(&task->killLock);
@@ -183,7 +171,7 @@ void anscheduler_task_dereference(task_t * task) {
 }
 
 task_t * anscheduler_task_for_pid(uint64_t pid) {
-  return NULL;
+  return anscheduler_pidmap_get(pid);
 }
 
 /******************
@@ -222,7 +210,7 @@ static task_t * _create_bare_task() {
     return NULL;
   }
   
-  task->pid = _pid_next();
+  task->pid = anscheduler_pidmap_alloc_pid();
   return task;
 }
 
@@ -316,6 +304,10 @@ static void _generate_kill_job(task_t * task) {
 }
 
 static void _free_task_method(task_t * task) {
+  anscheduler_cpu_lock();
+  anscheduler_pidmap_unset(task);
+  anscheduler_cpu_unlock();
+  
   // close the task's sockets, release the task's code (and free it, maybe),
   // free each thread's kernel and user stack
   
@@ -339,13 +331,17 @@ static void _free_task_method(task_t * task) {
     anscheduler_cpu_unlock();
   }
   
-  anscheduler_free(task);
-  _pid_release(task->pid);
-  
   // TODO: close sockets here, once they are implemented and I understand
   // how they will work better.
   
   anscheduler_cpu_lock();
+  
+  anidxset_free(&task->stacks);
+  anidxset_free(&task->descriptors);
+  
+  anscheduler_pidmap_free_pid(task->pid);
+  anscheduler_free(task);
+  
   anscheduler_loop_delete_cur_kernel();
 }
 
@@ -368,32 +364,4 @@ static void _dealloc_task_code_async(task_t * task) {
     
     anscheduler_cpu_unlock();
   }
-}
-
-static uint8_t _pid_hash(uint64_t pid) {
-  return (uint8_t)(pid & 0xff);
-}
-
-static uint64_t _pid_next() {
-  anscheduler_lock(&pidLock);
-  if (!pidPoolInitialized) {
-    if (!anscheduler_idxset_init(&pidPool)) {
-      anscheduler_abort("failed to initialize PID pool");
-      return 0;
-    }
-    pidPoolInitialized = true;
-  }
-  uint64_t nextPid = anidxset_get(&pidPool);
-  anscheduler_unlock(&pidLock);
-  return nextPid;
-}
-
-static void _pid_release(uint64_t aPid) {
-  anscheduler_lock(&pidLock);
-  if (!pidPoolInitialized) {
-    anscheduler_abort("cannot release a PID that was never allocated");
-    return;
-  }
-  anidxset_put(&pidPool, aPid);
-  anscheduler_unlock(&pidLock);
 }

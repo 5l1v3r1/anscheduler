@@ -16,16 +16,17 @@ void anscheduler_pidmap_free_pid(uint64_t pid);
 /**
  * @critical O(1)
  */
-void anschedulrer_pidmap_set(task_t * task);
+void anscheduler_pidmap_set(task_t * task);
 
 /**
  * @critical O(1)
  */
-void anschedulrer_pidmap_unset(task_t * task);
+void anscheduler_pidmap_unset(task_t * task);
 
 /**
+ * Returns a (referenced) task which was found for a certain PID.
  * @critical Best is O(1), worst is O(n)
  */
-task_t anschedulrer_pidmap_get(uint64_t pid);
+task_t * anscheduler_pidmap_get(uint64_t pid);
 
 #endif
