@@ -5,6 +5,11 @@
 #include <anscheduler_state.h> // you must create this
 #include <anidxset.h>
 
+#define ANSCHEDULER_MSG_TYPE_CONNECT 0
+#define ANSCHEDULER_MSG_TYPE_DATA 1
+
+#define ANSCHEDULER_MAX_MSG_BUFFER 0x8
+
 typedef struct task_t task_t;
 typedef struct thread_t thread_t;
 typedef struct socket_t socket_t;
@@ -26,9 +31,9 @@ struct task_t {
   uint64_t vmLock;
   void * vm;
   
-  // list of open sockets
+  // hash map of open sockets
   uint64_t socketsLock;
-  socket_link_t * firstSocket;
+  socket_link_t * sockets[0x10];
   
   // list of sockets with pending messages
   uint64_t pendingLock;
@@ -68,11 +73,14 @@ struct thread_t {
 } __attribute__((packed));
 
 struct socket_t {
+  uint64_t connRecLock;
   task_t * connector, * receiver;
   
   uint64_t msgsLock;
-  socket_msg_t * forConnector;
-  socket_msg_t * forReceiver;
+  uint64_t forConnectorCount;
+  socket_msg_t * forConnectorFirst, * forConnectorLast;
+  uint64_t forReceiverCount;
+  socket_msg_t * forReceiverFirst, * forReceiverLast;
 } __attribute__((packed));
 
 struct socket_link_t {
@@ -80,13 +88,21 @@ struct socket_link_t {
   socket_link_t * pendingNext, * pendingLast;
   socket_t * socket;
   uint64_t descriptor;
+  
+  uint64_t isConnector;
+  task_t * task;
+  
+  uint64_t closeLock;
+  uint64_t isClosed;
+  uint64_t refCount;
+  uint64_t closeCode;
 } __attribute__((packed));
 
 struct socket_msg_t {
-  socket_msg_t * next;
+  socket_msg_t * next, * last;
   uint64_t type;
-  uint64_t length;
-  // data array after this point in the object (0x18 bytes in)
+  uint64_t len;
+  char message[0xfe8]; // 0x1000 - 0x18
   
   // message types:
   // 0 = connect

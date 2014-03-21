@@ -59,6 +59,13 @@ void anscheduler_set_state(thread_t * thread,
                            void * ip,
                            void * arg1);
 
+/**
+ * If 0 is returned, this function has successfully saved a state into
+ * the thread. If this method returns 1, then the thread's state has been
+ * resumed!
+ */
+bool anscheduler_save_return_state(thread_t * thread);
+
 /*********
  * Timer *
  *********/

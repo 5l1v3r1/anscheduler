@@ -35,6 +35,13 @@ void anscheduler_loop_push(thread_t * newThread);
 void anscheduler_loop_run();
 
 /**
+ * Enters the scheduling loop. You do NOT have to call this from the CPU
+ * stack.
+ * @critical
+ */
+void anscheduler_loop_break_task();
+
+/**
  * Add a kernel thread to the scheduler queue. The kernel thread must not exit
  * via anscheduler_thread_exit(), but rather through 
  * anscheduler_loop_delete_cur_kernel()

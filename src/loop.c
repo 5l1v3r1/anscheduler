@@ -11,6 +11,7 @@ static thread_t * _next_thread(uint64_t * nextTick);
 static void _push_unconditional(thread_t * thread);
 static void _delete_cur_kernel(void * unused);
 static void _switch_to_thread(thread_t * thread);
+static void _run_loop_stub(void * unused);
 
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
@@ -91,6 +92,10 @@ void anscheduler_loop_run() {
   anscheduler_cpu_set_task(thread->task);
   anscheduler_cpu_set_thread(thread);
   anscheduler_thread_run(thread->task, thread);
+}
+
+void anscheduler_loop_break_task() {
+  anscheduler_cpu_stack_run(NULL, _run_loop_stub);
 }
 
 void anscheduler_loop_push_kernel(void * arg, void (* fn)(void * arg)) {
@@ -175,4 +180,8 @@ static void _switch_to_thread(thread_t * thread) {
   anscheduler_cpu_set_task(thread->task);
   anscheduler_cpu_set_thread(thread);
   anscheduler_thread_run(thread->task, thread);
+}
+
+static void _run_loop_stub(void * unused) {
+  anscheduler_loop_run();
 }

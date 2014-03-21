@@ -39,11 +39,11 @@ void anscheduler_pidmap_set(task_t * task) {
   uint8_t hash = _hash_pid(task->pid);
   if (!pidHashmap[hash]) {
     pidHashmap[hash] = task;
-    task->next = NULL;
-    task->last = NULL;
+    task->next = (task->last = NULL);
   } else {
     task->next = pidHashmap[hash];
     task->last = NULL;
+    pidHashmap[hash]->last = task;
     pidHashmap[hash] = task;
   }
   anscheduler_unlock(&pmLock);
