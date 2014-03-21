@@ -1,3 +1,5 @@
+#include "types.h"
+
 #define ANSCHEDULER_PAGE_FAULT_PRESENT 1
 #define ANSCHEDULER_PAGE_FAULT_WRITE 2
 #define ANSCHEDULER_PAGE_FAULT_USER 4
@@ -12,3 +14,8 @@
  * @critical
  */
 void anscheduler_page_fault(void * ptr, uint64_t flags);
+
+/**
+ * Call this whenever an external IRQ comes in.
+ */
+void anscheduler_irq(uint8_t irqNumber);
