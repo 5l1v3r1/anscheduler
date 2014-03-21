@@ -19,7 +19,12 @@
 void anscheduler_page_fault(void * ptr, uint64_t flags);
 
 /**
- * Call this whenever an external IRQ comes in.
+ * Call this whenever an external IRQ comes in. When the IRQ arrives, save
+ * the state of the current task. Then, if this function returns, restore the
+ * state of the current task and continue running it. This is because this
+ * function always has the possibility of not returning, but it could also
+ * return if the interrupt thread is working on something.
+ * @critical
  */
 void anscheduler_irq(uint8_t irqNumber);
 
