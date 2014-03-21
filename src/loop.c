@@ -115,7 +115,10 @@ void anscheduler_loop_delete_cur_kernel() {
 }
 
 void anscheduler_loop_switch(task_t * task, thread_t * thread) {
-  
+  anscheduler_loop_push_cur();
+  anscheduler_cpu_set_task(thread->task);
+  anscheduler_cpu_set_thread(thread);
+  anscheduler_thread_run(thread->task, thread);
 }
 
 static thread_t * _next_thread(uint64_t * nextTick) {
