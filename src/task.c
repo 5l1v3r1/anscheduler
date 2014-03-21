@@ -42,6 +42,11 @@ static void _free_task_method(task_t * task);
  */
 static void _dealloc_task_code_async(task_t * task);
 
+/**
+ * @critical
+ */
+static void _task_exit(void * codeVal);
+
 /******************
  * Implementation *
  ******************/
@@ -132,7 +137,7 @@ void anscheduler_task_launch(task_t * task) {
   anscheduler_task_dereference(task);
 }
 
-void anscheduler_task_kill(task_t * task) {
+void anscheduler_task_kill(task_t * task, uint64_t reason) {
   // emulate a test-and-or operation
   anscheduler_lock(&task->killLock);
   if (task->isKilled) {
@@ -140,11 +145,14 @@ void anscheduler_task_kill(task_t * task) {
     return;
   }
   task->isKilled = true;
-  uint64_t ref = task->refCount;
+  task->killReason = reason;
   anscheduler_unlock(&task->killLock);
   
-  if (ref) return; // wait for it to get released
-  _generate_kill_job(task);
+  // the thing will always have a reference to it because that is a
+  // requirement of our `task` argument!
+  
+  // if (ref) return; // wait for it to get released
+  // _generate_kill_job(task);
 }
 
 bool anscheduler_task_reference(task_t * task) {
@@ -172,6 +180,10 @@ void anscheduler_task_dereference(task_t * task) {
 
 task_t * anscheduler_task_for_pid(uint64_t pid) {
   return anscheduler_pidmap_get(pid);
+}
+
+void anscheduler_task_exit(uint8_t code) {
+  anscheduler_cpu_stack_run((void *)((long)code), _task_exit);
 }
 
 /******************
@@ -366,4 +378,13 @@ static void _dealloc_task_code_async(task_t * task) {
     
     anscheduler_cpu_unlock();
   }
+}
+
+static void _task_exit(void * codeVal) {
+  task_t * task = anscheduler_cpu_get_task();
+  anscheduler_cpu_set_task(NULL);
+  anscheduler_cpu_set_thread(NULL);
+  anscheduler_task_kill(task, (uint64_t)codeVal);
+  anscheduler_task_dereference(task);
+  anscheduler_loop_run();
 }

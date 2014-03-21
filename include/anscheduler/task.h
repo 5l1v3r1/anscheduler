@@ -3,6 +3,10 @@
 
 #include "types.h"
 
+#define ANSCHEDULER_TASK_KILL_REASON_SELF 0
+#define ANSCHEDULER_TASK_KILL_REASON_EXTERNAL 1
+#define ANSCHEDULER_TASK_KILL_REASON_MEMORY 2
+
 // maximum of 0x100000 threads when it's done this way
 #define ANSCHEDULER_TASK_CODE_PAGE              0x400
 #define ANSCHEDULER_TASK_KERN_STACKS_PAGE    0x100000
@@ -45,7 +49,7 @@ void anscheduler_task_launch(task_t * task);
  * @param task This task must have a reference to it.
  * @critical
  */
-void anscheduler_task_kill(task_t * task);
+void anscheduler_task_kill(task_t * task, uint64_t reason);
 
 /**
  * While references are held to a task, it cannot be killed.
@@ -69,5 +73,13 @@ void anscheduler_task_dereference(task_t * task);
  * a PID hashmap is used.
  */
 task_t * anscheduler_task_for_pid(uint64_t pid);
+
+/**
+ * Exit the current task with a specified code. This will automatically
+ * switch to the CPU stack for you and run the next task in the loop. This
+ * will not return.
+ * @critical
+ */
+void anscheduler_task_exit(uint8_t code);
 
 #endif

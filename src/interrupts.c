@@ -6,8 +6,37 @@
 static thread_t * interruptThread = NULL;
 static uint64_t threadLock = 0;
 
-void anscheduler_page_fault(void * ptr, uint64_t flags) {
+void anscheduler_page_fault(void * ptr, uint64_t _flags) {
+  // TODO: rewrite this function to use the _flags argument.
   
+  // Otherwise, kill the task.
+  
+  task_t * task = anscheduler_cpu_get_task();
+  if (!task) anscheduler_abort("kernel thread caused page fault!");
+  
+  anscheduler_lock(&task->vmLock);
+  uint16_t flags;
+  uint64_t faultPage = ((uint64_t)ptr) >> 12;
+  uint64_t entry = anscheduler_vm_lookup(task->vm, faultPage, &flags);
+  if ((flags & ANSCHEDULER_PAGE_FLAG_UNALLOC) && !entry) {
+    // allocate the page
+    flags = ANSCHEDULER_PAGE_FLAG_USER
+      | ANSCHEDULER_PAGE_FLAG_PRESENT
+      | ANSCHEDULER_PAGE_FLAG_WRITE;
+    void * ptr = anscheduler_alloc(0x1000);
+    anscheduler_zero(ptr, 0x1000);
+    anscheduler_vm_map(task->vm, faultPage, ((uint64_t)ptr) >> 12, flags);
+  } else if (flags & ANSCHEDULER_PAGE_FLAG_PRESENT) {
+    if (!(flags & ANSCHEDULER_PAGE_FLAG_USER)) {
+      anscheduler_unlock(&task->vmLock);
+      anscheduler_task_exit(ANSCHEDULER_TASK_KILL_REASON_MEMORY);
+    }
+  } else {
+    anscheduler_unlock(&task->vmLock);
+    anscheduler_task_exit(ANSCHEDULER_TASK_KILL_REASON_MEMORY);
+  }
+  anscheduler_unlock(&task->vmLock);
+  anscheduler_thread_run(task, anscheduler_cpu_get_thread());
 }
 
 void anscheduler_irq(uint8_t irqNumber) {

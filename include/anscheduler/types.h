@@ -49,6 +49,7 @@ struct task_t {
   uint64_t killLock;
   uint64_t refCount; // when this reaches 0 and isKilled = 1, kill this task
   uint64_t isKilled; // 0 or 1, starts at 0
+  uint64_t killReason;
 } __attribute__((packed));
 
 struct thread_t {
