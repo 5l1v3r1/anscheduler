@@ -356,6 +356,7 @@ static void _free_task_method(task_t * task) {
   // free the general structures on the task
   anidxset_free(&task->stacks);
   anidxset_free(&task->descriptors);
+  anscheduler_vm_root_free(task->vm);
   
   anscheduler_pidmap_free_pid(task->pid);
   anscheduler_free(task);
