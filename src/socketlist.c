@@ -1,6 +1,6 @@
-#include "socketmap.h"
+#include "socketlist.h"
 #include <anscheduler/functions.h>
-#include <anscheduler/sockets.h>
+#include <anscheduler/socket.h>
 
 static uint8_t _descriptor_hash(uint64_t desc);
 
@@ -41,7 +41,7 @@ socket_desc_t * anscheduler_descriptor_find(task_t * task, uint64_t desc) {
   anscheduler_lock(&task->socketsLock);
   socket_desc_t * obj = task->sockets[hash];
   while (obj) {
-    if (obj->desc == desc) {
+    if (obj->descriptor == desc) {
       obj = anscheduler_socket_reference(obj) ? obj : NULL;
       anscheduler_unlock(&task->socketsLock);
       return obj;
@@ -55,7 +55,7 @@ void anscheduler_task_pending(task_t * task, socket_desc_t * desc) {
   anscheduler_lock(&task->pendingLock);
   if (desc->pendingLast || desc->pendingNext || task->firstPending == desc) {
     anscheduler_unlock(&task->pendingLock);
-    return NULL;
+    return;
   }
   
   if (task->firstPending) {
@@ -83,6 +83,7 @@ void anscheduler_task_not_pending(task_t * task, socket_desc_t * desc) {
   if (desc->pendingNext) {
     desc->pendingNext->pendingLast = desc->pendingLast;
   }
+  desc->pendingNext = (desc->pendingLast = NULL);
   anscheduler_unlock(&task->pendingLock);
 }
 
@@ -91,11 +92,12 @@ socket_desc_t * anscheduler_task_pop_pending(task_t * task) {
   socket_desc_t * p = task->firstPending;
   while (p) {
     task->firstPending = p->pendingNext;
+    p->pendingNext = (p->pendingLast = NULL);
     if (anscheduler_socket_reference(p)) {
       anscheduler_unlock(&task->pendingLock);
       return p;
     }
-    p = p->pendingNext;
+    p = task->firstPending;
   }
   anscheduler_unlock(&task->pendingLock);
   return NULL;
