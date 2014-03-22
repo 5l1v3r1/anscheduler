@@ -10,6 +10,7 @@ typedef struct {
   thread_t * thread;
   bool isLocked;
   uint64_t nextInterrupt;
+  void * cpuStack;
 } cpu_info;
 
 cpu_info * antest_get_current_cpu_info();

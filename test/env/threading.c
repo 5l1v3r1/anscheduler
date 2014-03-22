@@ -1,4 +1,8 @@
 #include "threading.h"
+#include "timer.h"
+#include "interrupts.h"
+#include "alloc.h"
+#include <unistd.h>
 #include <assert.h>
 #include <stdio.h>
 #include <pthread.h>
@@ -15,6 +19,7 @@ static uint64_t cpuCount = 0;
 __thread cpu_info * cpu;
 
 static void * thread_enter(newthread_args * args);
+static bool test_for_interrupt();
 
 cpu_info * antest_get_current_cpu_info() {
   return cpu;
@@ -27,17 +32,17 @@ void antest_launch_thread(void * arg, void (* method)(void *)) {
 }
 
 void anscheduler_cpu_lock() {
-  cpu_info * info = antest_get_current_cpu_info();
-  assert(!info->isLocked);
-  info->isLocked = true;
+  assert(!cpu->isLocked);
+  cpu->isLocked = true;
 }
 
 void anscheduler_cpu_unlock() {
-  cpu_info * info = antest_get_current_cpu_info();
-  assert(info->isLocked);
-  info->isLocked = false;
+  assert(cpu->isLocked);
+  cpu->isLocked = false;
   
-  // TODO: here, check if a timer should be delivered
+  if (test_for_interrupt()) {
+    antest_handle_timer_interrupt();
+  }
 }
 
 task_t * anscheduler_cpu_get_task() {
@@ -61,16 +66,29 @@ void anscheduler_cpu_notify_invlpg(task_t * task) {
 }
 
 void anscheduler_cpu_notify_dead(task_t * task) {
-  // TODO: loop through here and set the next timer ticks of each CPU
+  int i;
+  for (i = 0; i < cpuCount; i++) {
+    if (cpus[i].task == task) {
+      cpus[i].nextInterrupt = 0;
+    }
+  }
 }
 
 void anscheduler_cpu_stack_run(void * arg, void (* fn)(void * a)) {
-  // TODO: allocate CPU stacks
+  void * ptr = cpu->cpuStack + 0x1000;
+  __asm__("mov %%rcx, %%rsp\n"
+          "callq *%%rax"
+          : : "c" (ptr), "D" (arg), "a" (fn));
 }
 
 void anscheduler_cpu_halt() {
   assert(!antest_get_current_cpu_info()->isLocked);
-  // TODO: here, sleep until timer tick time
+  while (!test_for_interrupt()) {
+    usleep(1000);
+  }
+  
+  anscheduler_cpu_lock();
+  antest_handle_timer_interrupt();
 }
 
 static void * thread_enter(newthread_args * _args) {
@@ -81,6 +99,8 @@ static void * thread_enter(newthread_args * _args) {
   cpu = &cpus[cpuCount++];
   anlock_unlock(&cpusLock);
   
+  cpu->cpuStack = anscheduler_alloc(0x1000);
+  
   printf("in new thread!\n");
   args.method(args.arg);
   
@@ -88,4 +108,13 @@ static void * thread_enter(newthread_args * _args) {
   cpuCount--;
   anlock_unlock(&cpusLock);
   return NULL;
+}
+
+static bool test_for_interrupt() {
+  uint64_t now = anscheduler_get_time();
+  if (cpu->nextInterrupt <= now) {
+    anscheduler_timer_cancel();
+    return true;
+  }
+  return false;
 }
