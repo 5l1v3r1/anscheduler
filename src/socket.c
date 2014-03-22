@@ -8,32 +8,35 @@ static void _socket_add(socket_link_t * link);
 static void _socket_remove(socket_link_t * link);
 static void _socket_destroy(socket_link_t * link);
 static void _free_socket(socket_t * socket);
+
+/**
+ * @critical Ends critical section, will automatically dereference link.
+ */
 static void _wakeup_poller(socket_link_t * link);
+
+/**
+ * Finds the link for the other end of a socket. If NULL is not returned,
+ * then both the other link AND the other task will be referenced.
+ * @critical
+ */
+static socket_link_t * _find_other_end(socket_link_t * link);
+
+static socket_link_t * _task_add_new_link(socket_t * socket,
+                                          task_t * task,
+                                          bool isConnector);
+static void _task_add_pending(socket_link_t * link);
+static void _task_remove_pending(socket_link_t * link);
 
 socket_link_t * anscheduler_socket_new() {
   socket_t * socket = anscheduler_alloc(sizeof(socket_t));
   if (!socket) return NULL;
-  socket_link_t * link = anscheduler_alloc(sizeof(socket_link_t));
-  if (!link) {
-    anscheduler_free(socket);
-    return NULL;
-  }
   anscheduler_zero(socket, sizeof(socket_t));
-  anscheduler_zero(link, sizeof(socket_link_t));
   
   task_t * task = anscheduler_cpu_get_task();
-  link->socket = socket;
-  link->isConnector = true;
-  socket->connector = task;
-  
-  anscheduler_lock(&task->descriptorsLock);
-  uint64_t desc = anidxset_get(&task->descriptors);
-  anscheduler_unlock(&task->descriptorsLock);
-  link->descriptor = desc;
-  link->task = task;
-  link->refCount = 1;
-  
-  _socket_add(link);
+  socket_link_t * link = _task_add_new_link(socket, task, true);
+  if (!link) {
+    anscheduler_free(socket);
+  }
   return link;
 }
 
@@ -67,6 +70,10 @@ bool anscheduler_socket_reference(socket_link_t * socket) {
 
 void anscheduler_socket_dereference(socket_link_t * socket) {
   anscheduler_lock(&socket->closeLock);
+  if (socket->isClosed && socket->refCount == 0) {
+    anscheduler_unlock(&socket->closeLock);
+    return;
+  }
   socket->refCount--;
   if (!socket->refCount && socket->isClosed) {
     anscheduler_unlock(&socket->closeLock);
@@ -158,6 +165,23 @@ socket_msg_t * anscheduler_socket_read(socket_link_t * socket) {
   return msg;
 }
 
+bool anscheduler_socket_connect(socket_link_t * socket, task_t * task) {
+  // create a new file descriptor on the other end
+  socket_link_t * link = _task_add_new_link(socket->socket, task, false);
+  if (!link) return false;
+  
+  // allocate the connect message
+  socket_msg_t * msg = anscheduler_alloc(sizeof(socket_msg_t));
+  if (!msg) anscheduler_abort("Failed to allocate connect message");
+  msg->type = ANSCHEDULER_MSG_TYPE_CONNECT;
+  msg->len = 8;
+  (*((uint64_t *)msg->message)) = link->descriptor;
+  if (!anscheduler_socket_msg(link, msg)) {
+    anscheduler_abort("Failed to send socket connect message");
+  }
+  return true;
+}
+
 void anscheduler_socket_close(socket_link_t * socket, uint64_t code) {
   anscheduler_lock(&socket->closeLock);
   socket->isClosed = true;
@@ -209,8 +233,13 @@ static void _socket_destroy(socket_link_t * link) {
   }
   anscheduler_unlock(&link->socket->connRecLock);
   
+  anscheduler_lock(&link->task->pendingLock);
+  _task_remove_pending(link);
+  anscheduler_unlock(&link->task->pendingLock);
+  
   if (hasOtherEnd) {
     socket_msg_t * msg = anscheduler_alloc(sizeof(socket_msg_t));
+    if (!msg) anscheduler_abort("Failed to allocate closed message");
     msg->type = link->closeCode;
     msg->len = 8;
     (*((uint64_t *)msg->message)) = link->closeCode;
@@ -237,32 +266,110 @@ static void _free_socket(socket_t * socket) {
 }
 
 static void _wakeup_poller(socket_link_t * link) {
-  task_t * otherEnd = NULL;
+  socket_link_t * otherLink = _find_other_end(link);
+  // TODO: huge problem right here
+  anscheduler_socket_dereference(link);
+  if (!otherEnd) return;
+  
+  // add this guy to the pending list
+  anscheduler_lock(&otherTask->pendingLock);
+  _task_add_pending(otherEnd);
+  anscheduler_unlock(&otherTask->pendingLock);
+  
+  // execute whatever polling thread there might be
+  anscheduler_lock(&otherTask->threadsLock);
+  thread_t * th = otherTask->firstThread;
+  while (th) {
+    if (__sync_fetch_and_and(&th->isPolling, 0)) {
+      anscheduler_unlock(&otherTask->threadsLock);
+      thread_t * curThread = anscheduler_cpu_get_thread();
+      anscheduler_socket_dereference(otherEnd);
+      bool res = anscheduler_save_return_state(curThread);
+      if (res) return;
+      anscheduler_loop_switch(otherTask, th);
+    }
+    th = th->next;
+  }
+  anscheduler_unlock(&otherTask->threadsLock);
+  
+  // if we get to this point, we have not found any polling threads, so we
+  // must dereference the task.
+  anscheduler_socket_dereference(otherEnd);
+  anscheduler_task_dereference(otherTask);
+}
+
+static socket_link_t * _find_other_end(socket_link_t * link) {
+  socket_link_t * otherEnd = NULL;
+  
   anscheduler_lock(&link->socket->connRecLock);
   if (link->isConnector) {
     otherEnd = link->socket->receiver;
   } else {
     otherEnd = link->socket->connector;
   }
+  
+  // reference the other end socket AND task!
   if (otherEnd) {
-    if (!anscheduler_task_reference(otherEnd)) {
+    if (!anscheduler_socket_reference(otherEnd)) {
       otherEnd = NULL;
+    } else {
+      if (!anscheduler_task_reference(otherEnd->task)) {
+        anscheduler_socket_dereference(otherEnd);
+        otherEnd = NULL;
+      }
     }
   }
   anscheduler_unlock(&link->socket->connRecLock);
-  if (!otherEnd) return;
+  return otherEnd;
+}
+
+static socket_link_t * _task_add_new_link(socket_t * socket,
+                                          task_t * task,
+                                          bool isConnector) {
+  socket_link_t * link = anscheduler_alloc(sizeof(socket_link_t));
+  if (!link) return NULL;
   
-  anscheduler_lock(&otherEnd->threadsLock);
-  thread_t * th = otherEnd->firstThread;
-  while (th) {
-    if (__sync_fetch_and_and(&th->isPolling, 0)) {
-      anscheduler_unlock(&otherEnd->threadsLock);
-      thread_t * curThread = anscheduler_cpu_get_thread();
-      bool res = anscheduler_save_return_state(curThread);
-      if (res) return; // resuming
-      anscheduler_loop_switch(otherEnd, th);
+  anscheduler_zero(link, sizeof(socket_link_t));
+
+  link->socket = socket;
+  link->isConnector = isConnector;
+  anscheduler_lock(&socket->connRecLock);
+  if (isConnector) socket->connector = link;
+  else socket->receiver = link;
+  anscheduler_unlock(&socket->connRecLock);
+
+  anscheduler_lock(&task->descriptorsLock);
+  uint64_t desc = anidxset_get(&task->descriptors);
+  anscheduler_unlock(&task->descriptorsLock);
+  link->descriptor = desc;
+  link->task = task;
+  link->refCount = 1;
+
+  _socket_add(link);
+  return link;
+}
+
+static void _task_add_pending(socket_link_t * link) {
+  task_t * task = link->task;
+  if (link->pendingNext || !link->pendingLast) return;
+  if (task->firstPending == link) return;
+  link->pendingNext = task->firstPending;
+  link->pendingLast = NULL;
+  task->firstPending = link;
+}
+
+static void _task_remove_pending(socket_link_t * link) {
+  task_t * task = link->task;
+  if (task->firstPending == link) {
+    task->firstPending = link->pendingNext;
+    if (link->pendingNext) {
+      link->pendingNext->pendingLast = NULL;
     }
-    th = th->next;
+    return;
   }
-  anscheduler_unlock(&otherEnd->threadsLock);
+  if (!link->pendingLast) return;
+  link->pendingLast->pendingNext = link->pendingNext;
+  if (link->pendingNext) {
+    link->pendingNext->pendingLast = link->pendingLast;
+  }
 }

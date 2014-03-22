@@ -36,10 +36,20 @@ void anscheduler_loop_run();
 
 /**
  * Enters the scheduling loop. You do NOT have to call this from the CPU
- * stack.
+ * stack.  If you call this without somehow pushing your current thread, the
+ * thread will not be pushed back to the scheduling loop and may never be run
+ * again (unless you set isPolling = true).
  * @critical
  */
 void anscheduler_loop_break_task();
+
+/**
+ * Resign early from this time slice.  This can be called from any stack. It
+ * is equivalent to switching to the CPU stack and then calling both
+ * anscheduler_loop_push_cur() and anscheduler_loop_run();
+ * @critical
+ */
+void anscheduler_loop_resign();
 
 /**
  * Add a kernel thread to the scheduler queue. The kernel thread must not exit

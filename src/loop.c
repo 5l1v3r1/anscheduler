@@ -12,6 +12,7 @@ static void _push_unconditional(thread_t * thread);
 static void _delete_cur_kernel(void * unused);
 static void _switch_to_thread(thread_t * thread);
 static void _run_loop_stub(void * unused);
+static void _resign_stub(void * unused);
 
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
@@ -96,6 +97,10 @@ void anscheduler_loop_run() {
 
 void anscheduler_loop_break_task() {
   anscheduler_cpu_stack_run(NULL, _run_loop_stub);
+}
+
+void anscheduler_loop_resign() {
+  anscheduler_cpu_stack_run(NULL, _resign_stub);
 }
 
 void anscheduler_loop_push_kernel(void * arg, void (* fn)(void * arg)) {
@@ -183,5 +188,10 @@ static void _switch_to_thread(thread_t * thread) {
 }
 
 static void _run_loop_stub(void * unused) {
+  anscheduler_loop_run();
+}
+
+static void _resign_stub(void * unused) {
+  anscheduler_loop_push_cur();
   anscheduler_loop_run();
 }

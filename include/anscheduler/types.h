@@ -72,11 +72,15 @@ struct thread_t {
   anscheduler_state state;
 } __attribute__((packed));
 
+/**
+ * An internal data structure which stores a message queue and points to the
+ * two socket endpoints, the connector and the receiver.
+ */
 struct socket_t {
-  uint64_t connRecLock;
-  task_t * connector, * receiver;
+  uint64_t connRecLock; // locks the two fields that follow
+  socket_link_t * connector, * receiver;
   
-  uint64_t msgsLock;
+  uint64_t msgsLock; // locks the next 6 fields
   uint64_t forConnectorCount;
   socket_msg_t * forConnectorFirst, * forConnectorLast;
   uint64_t forReceiverCount;
@@ -84,18 +88,19 @@ struct socket_t {
 } __attribute__((packed));
 
 struct socket_link_t {
-  socket_link_t * next, * last;
-  socket_link_t * pendingNext, * pendingLast;
-  socket_t * socket;
-  uint64_t descriptor;
+  socket_link_t * next, * last; // in the task
+  socket_link_t * pendingNext, * pendingLast; // in the task's pending list
   
-  uint64_t isConnector;
-  task_t * task;
+  socket_t * socket; // underlying socket
+  uint64_t descriptor; // task specific fd
   
-  uint64_t closeLock;
-  uint64_t isClosed;
-  uint64_t refCount;
-  uint64_t closeCode;
+  uint64_t isConnector; // true = connector, false = receiver
+  task_t * task; // task which owns the socket link
+  
+  uint64_t closeLock; // applies to next three fields
+  uint64_t isClosed; // true when close() has been requested
+  uint64_t refCount; // when 0 and isClosed = true, shutdown
+  uint64_t closeCode; // status code for close message
 } __attribute__((packed));
 
 struct socket_msg_t {
