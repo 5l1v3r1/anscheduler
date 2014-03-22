@@ -5,12 +5,21 @@
 
 static uint8_t _descriptor_hash(uint64_t desc);
 static void _socket_add(socket_link_t * link);
-static void _socket_remove(socket_link_t * link);
 static void _socket_destroy(socket_link_t * link);
 static void _free_socket(socket_t * socket);
 
 /**
- * @critical Ends critical section, will automatically dereference link.
+ * Dereferences a socket, pushing a closed message to the message queue if it
+ * was closed and the ref count reached 0. If closed, false is returned,
+ * otherwise true.
+ * @param link A referenced link.
+ * @critical
+ */
+static bool _socket_dereference(socket_link_t * link);
+
+/**
+ * @param link A link, which will be dereferenced before return
+ * @critical -> @noncritical -> @critical
  */
 static void _wakeup_poller(socket_link_t * link);
 
@@ -69,18 +78,7 @@ bool anscheduler_socket_reference(socket_link_t * socket) {
 }
 
 void anscheduler_socket_dereference(socket_link_t * socket) {
-  anscheduler_lock(&socket->closeLock);
-  if (socket->isClosed && socket->refCount == 0) {
-    anscheduler_unlock(&socket->closeLock);
-    return;
-  }
-  socket->refCount--;
-  if (!socket->refCount && socket->isClosed) {
-    anscheduler_unlock(&socket->closeLock);
-    _socket_destroy(socket);
-    return;
-  }
-  anscheduler_unlock(&socket->closeLock);
+  
 }
 
 bool anscheduler_socket_msg(socket_link_t * socket, socket_msg_t * msg) {
@@ -189,35 +187,7 @@ void anscheduler_socket_close(socket_link_t * socket, uint64_t code) {
   anscheduler_unlock(&socket->closeLock);
 }
 
-static uint8_t _descriptor_hash(uint64_t desc) {
-  return (uint8_t)(desc & 0xf);
-}
 
-static void _socket_add(socket_link_t * link) {
-  task_t * task = link->task;
-  uint8_t hash = _descriptor_hash(link->descriptor);
-  anscheduler_lock(&task->socketsLock);
-  link->next = task->sockets[hash];
-  link->last = NULL;
-  if (task->sockets[hash]) {
-    task->sockets[hash]->last = link;
-  }
-  task->sockets[hash] = link;
-  anscheduler_unlock(&task->socketsLock);
-}
-
-static void _socket_remove(socket_link_t * link) {
-  task_t * task = link->task;
-  uint8_t hash = _descriptor_hash(link->descriptor);
-  anscheduler_lock(&task->socketsLock);
-  if (!link->last) {
-    task->sockets[hash] = link->next;
-  } else {
-    link->last->next = link->next;
-  }
-  if (link->next) link->next->last = link->last;
-  anscheduler_unlock(&task->socketsLock);
-}
 
 static void _socket_destroy(socket_link_t * link) {
   _socket_remove(link);
@@ -266,8 +236,8 @@ static void _free_socket(socket_t * socket) {
 }
 
 static void _wakeup_poller(socket_link_t * link) {
+  if (__sync_fetch_and_or(link->isSending, 1)) return;
   socket_link_t * otherLink = _find_other_end(link);
-  // TODO: huge problem right here
   anscheduler_socket_dereference(link);
   if (!otherEnd) return;
   
@@ -326,27 +296,7 @@ static socket_link_t * _find_other_end(socket_link_t * link) {
 static socket_link_t * _task_add_new_link(socket_t * socket,
                                           task_t * task,
                                           bool isConnector) {
-  socket_link_t * link = anscheduler_alloc(sizeof(socket_link_t));
-  if (!link) return NULL;
   
-  anscheduler_zero(link, sizeof(socket_link_t));
-
-  link->socket = socket;
-  link->isConnector = isConnector;
-  anscheduler_lock(&socket->connRecLock);
-  if (isConnector) socket->connector = link;
-  else socket->receiver = link;
-  anscheduler_unlock(&socket->connRecLock);
-
-  anscheduler_lock(&task->descriptorsLock);
-  uint64_t desc = anidxset_get(&task->descriptors);
-  anscheduler_unlock(&task->descriptorsLock);
-  link->descriptor = desc;
-  link->task = task;
-  link->refCount = 1;
-
-  _socket_add(link);
-  return link;
 }
 
 static void _task_add_pending(socket_link_t * link) {

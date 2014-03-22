@@ -42,9 +42,10 @@ void anscheduler_socket_dereference(socket_link_t * socket);
  * When the message is sent successfully, the reference to `socket` is
  * also consumed. You should not hold a reference to `socket` through a call
  * to this method, because it could trigger a task switch.
- * @critical Call from a critical section, but consider this the END of the
+ * @critical -> @noncritical -> @critical consider this the END of the
  * critical section. If/when it returns, it will be the beginning of a new
- * critical section.
+ * critical section. This means: do not hold any locks across or references
+ * across this call.
  */
 bool anscheduler_socket_msg(socket_link_t * socket, socket_msg_t * msg);
 
