@@ -1,6 +1,8 @@
 #include "threading.h"
 #include <assert.h>
 #include <stdio.h>
+#include <pthread.h>
+#include <anlock.h>
 
 typedef struct {
   void (* method)(void *);
@@ -10,12 +12,12 @@ typedef struct {
 static uint64_t cpusLock = 0;
 static cpu_info cpus[0x20];
 static uint64_t cpuCount = 0;
-__thread cpu_info cpu;
+__thread cpu_info * cpu;
 
 static void * thread_enter(newthread_args * args);
 
 cpu_info * antest_get_current_cpu_info() {
-  return &cpu;
+  return cpu;
 }
 
 void antest_launch_thread(void * arg, void (* method)(void *)) {
@@ -74,7 +76,16 @@ void anscheduler_cpu_halt() {
 static void * thread_enter(newthread_args * _args) {
   newthread_args args = *_args;
   free(_args);
+  
+  anlock_lock(&cpusLock);
+  cpu = &cpus[cpuCount++];
+  anlock_unlock(&cpusLock);
+  
   printf("in new thread!\n");
   args.method(args.arg);
-  return;
+  
+  anlock_lock(&cpusLock);
+  cpuCount--;
+  anlock_unlock(&cpusLock);
+  return NULL;
 }
