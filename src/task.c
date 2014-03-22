@@ -2,6 +2,7 @@
 #include <anscheduler/functions.h>
 #include <anscheduler/loop.h> // for kernel threads
 #include <anscheduler/thread.h> // for deallocation
+#include <anscheduler/socket.h> // for socket closing
 #include "util.h" // for idxset
 #include "pidmap.h"
 
@@ -41,6 +42,11 @@ static void _free_task_method(task_t * task);
  * @noncritical
  */
 static void _dealloc_task_code_async(task_t * task);
+
+/**
+ * @noncritical
+ */
+static void _close_task_sockets_async(task_t * task);
 
 /**
  * @critical
@@ -322,8 +328,8 @@ static void _free_task_method(task_t * task) {
   anscheduler_pidmap_unset(task);
   anscheduler_cpu_unlock();
   
-  // close the task's sockets, release the task's code (and free it, maybe),
-  // free each thread's kernel and user stack
+  // wait for each socket to die so that we know nothing references the task
+  _close_task_sockets_async(task);
   
   // release the task's code
   if (!__sync_sub_and_fetch(task->codeRetainCount, 1)) {
@@ -345,11 +351,9 @@ static void _free_task_method(task_t * task) {
     anscheduler_cpu_unlock();
   }
   
-  // TODO: close sockets here, once they are implemented and I understand
-  // how they will work better.
-  
   anscheduler_cpu_lock();
   
+  // free the general structures on the task
   anidxset_free(&task->stacks);
   anidxset_free(&task->descriptors);
   
@@ -377,6 +381,36 @@ static void _dealloc_task_code_async(task_t * task) {
     anscheduler_vm_unmap(task->vm, i);
     
     anscheduler_cpu_unlock();
+  }
+}
+
+static void _close_task_sockets_async(task_t * task) {
+  anscheduler_cpu_lock();
+  thread_t * thread = anscheduler_cpu_get_thread();
+  
+  int i;
+  for (i = 0; i < 0x10; i++) {
+    anscheduler_lock(&task->socketsLock);
+    
+    while (task->sockets[i]) {
+      socket_desc_t * desc = task->sockets[i];
+      anscheduler_socket_close(desc, 1 | (task->killReason << 1));
+      anscheduler_unlock(&task->socketsLock);
+      
+      // wait until the descriptor is closed
+      while (1) {
+        anscheduler_lock(&task->socketsLock);
+        if (task->sockets[i] != desc) {
+          break;
+        }
+        anscheduler_unlock(&task->socketsLock);
+        bool ret = anscheduler_save_return_state(thread);
+        if (ret) continue;
+        anscheduler_loop_resign();
+      }
+    }
+    
+    anscheduler_unlock(&task->socketsLock);
   }
 }
 

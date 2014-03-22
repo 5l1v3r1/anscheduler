@@ -174,7 +174,7 @@ void * anscheduler_thread_kernel_stack(task_t * task, thread_t * thread) {
 }
 
 void * anscheduler_thread_interrupt_stack(thread_t * thread) {
-  uint64_t page = thread->stack + ANSCHEDULER_TASK_KERNEL_STACKS_PAGE;
+  uint64_t page = thread->stack + ANSCHEDULER_TASK_KERN_STACKS_PAGE;
   return (void *)((page + 1) << 12);
 }
 

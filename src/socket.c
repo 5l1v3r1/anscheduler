@@ -43,6 +43,11 @@ static void _wakeup_endpoint(socket_desc_t * dest);
  */
 static void _async_msg(msginfo_t * info);
 
+/**
+ * @noncritical
+ */
+static void _socket_free(socket_t * socket);
+
 socket_desc_t * anscheduler_socket_new() {
   socket_t * socket = anscheduler_alloc(sizeof(socket_t));
   if (!socket) return NULL;
@@ -208,8 +213,8 @@ bool anscheduler_socket_connect(socket_desc_t * socket, task_t * task) {
 
 void anscheduler_socket_close(socket_desc_t * socket, uint64_t code) {
   anscheduler_lock(&socket->closeLock);
+  if (!socket->isClosed) socket->closeCode = code;
   socket->isClosed = true;
-  socket->closeCode = code;
   anscheduler_unlock(&socket->closeLock);
 }
 
@@ -266,7 +271,9 @@ static void _socket_hangup(socket_desc_t * socket) {
   if (!otherEnd) {
     anscheduler_free(socket);
     if (shouldFree) {
-      anscheduler_free(sock);
+      anscheduler_cpu_unlock();
+      _socket_free(sock);
+      anscheduler_cpu_lock();
     }
   } else {
     socket_msg_t * msg = anscheduler_alloc(sizeof(socket_msg_t));
@@ -284,11 +291,15 @@ static void _socket_hangup(socket_desc_t * socket) {
     anscheduler_lock(&sock->connRecLock);
     if (socket->isConnector) sock->connector = NULL;
     else sock->receiver = NULL;
-    
     shouldFree = sock->receiver == sock->connector;
     anscheduler_unlock(&sock->connRecLock);
+    
     anscheduler_free(socket);
-    if (shouldFree) anscheduler_free(sock);
+    if (shouldFree) { 
+      anscheduler_cpu_unlock();
+      _socket_free(sock);
+      anscheduler_cpu_lock();
+    }
   }
   
   anscheduler_loop_delete_cur_kernel();
@@ -368,4 +379,36 @@ static void _async_msg(msginfo_t * _info) {
     anscheduler_socket_dereference(info.descriptor);
   }
   anscheduler_loop_delete_cur_kernel();
+}
+
+static void _socket_free(socket_t * socket) {
+  // free for connector messages
+  while (true) {
+    anscheduler_cpu_lock();
+    if (!socket->forConnectorFirst) {
+      anscheduler_cpu_unlock();
+      break;
+    }
+    socket_msg_t * msg = socket->forConnectorFirst;
+    socket->forConnectorFirst = msg->next;
+    anscheduler_free(msg);
+    anscheduler_cpu_unlock();
+  }
+  
+  // free for receiver messages
+  while (true) {
+    anscheduler_cpu_lock();
+    if (!socket->forReceiverFirst) {
+      anscheduler_cpu_unlock();
+      break;
+    }
+    socket_msg_t * msg = socket->forReceiverFirst;
+    socket->forReceiverFirst = msg->next;
+    anscheduler_free(msg);
+    anscheduler_cpu_unlock();
+  }
+  
+  anscheduler_cpu_lock();
+  anscheduler_free(socket);
+  anscheduler_cpu_unlock();
 }
