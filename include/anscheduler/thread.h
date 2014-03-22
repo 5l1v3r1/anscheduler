@@ -47,9 +47,25 @@ void anscheduler_thread_deallocate(task_t * task, thread_t * thread);
 
 /**
  * Returns the beginning of the kernel stack for a given thread or NULL if one
- * is not mapped.
+ * is not mapped.  The address returned is in the kernel's address space.
  * @critical
  */
 void * anscheduler_thread_kernel_stack(task_t * task, thread_t * thread);
+
+/**
+ * Returns the address of the thread's kernel stack in the user's address
+ * space. This address can be used to set the stack pointer after an
+ * interrupt.
+ * @critical
+ */
+void * anscheduler_thread_interrupt_stack(thread_t * thread);
+
+/**
+ * Returns the virtual address in the task's address space of a thread's user
+ * stack. The thread's task must be referenced or, in some other way, you must
+ * be sure that the thread will not be deallocated.
+ * @critical
+ */
+void * anscheduler_thread_user_stack(thread_t * thread);
 
 #endif

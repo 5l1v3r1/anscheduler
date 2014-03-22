@@ -28,14 +28,47 @@
  * @critical
  */
 void * anscheduler_alloc(uint64_t size);
+
+/**
+ * Frees a buffer allocated with anscheduler_alloc().
+ * @critical
+ */
 void anscheduler_free(void * buffer);
 
+/**
+ * Locks a spinlock of some sort which should be represented by 64-bits.
+ * @critical
+ */
 void anscheduler_lock(uint64_t * ptr);
+
+/**
+ * Unlocks something locked with anscheduler_lock()
+ * @critical
+ */
 void anscheduler_unlock(uint64_t * ptr);
 
+/**
+ * Terminates application or kernel flow.
+ * @critical
+ */
 void anscheduler_abort(const char * error);
+
+/**
+ * Zero a chunk of memory. This is an external function because some CPUs may
+ * have an optimized way of doing this.
+ * @noncritical or @critical
+ */
 void anscheduler_zero(void * buf, int len);
+
+/**
+ * Atomically increment the value at a memory address.
+ * @critical
+ */
 void anscheduler_inc(uint64_t * ptr);
+
+/**
+ * Atomically OR a 32-bit value at a memory address with a specified value.
+ */
 void anscheduler_or_32(uint32_t * ptr, uint32_t flag);
 
 /*********************
@@ -44,6 +77,8 @@ void anscheduler_or_32(uint32_t * ptr, uint32_t flag);
 
 /**
  * @param task Must have a reference to it.
+ * @param thread The thread whose state to pick up
+ * @critical
  */
 void anscheduler_thread_run(task_t * task, thread_t * thread);
 
@@ -70,10 +105,33 @@ bool anscheduler_save_return_state(thread_t * thread);
  * Timer *
  *********/
 
+/**
+ * Make a tick occur in at least `ticks` ticks.
+ * @critical
+ */
 void anscheduler_timer_set(uint32_t ticks);
+
+/**
+ * Set a slow timer. Call this before doing long operations in scheduling
+ * functions in order to ensure that the system clock stays calibrated.
+ * @critical
+ */
 void anscheduler_timer_set_far();
+
+/**
+ * Cancel whatever timer has been set.
+ * @critical
+ */
 void anscheduler_timer_cancel();
+
+/**
+ * Get the current timestamp, in ticks.
+ */
 uint64_t anscheduler_get_time();
+
+/**
+ * Get the number of ticks in one second.
+ */
 uint64_t anscheduler_second_length();
 
 /***************
@@ -102,10 +160,28 @@ task_t * anscheduler_cpu_get_task();
  */
 thread_t * anscheduler_cpu_get_thread();
 
+/**
+ * @critical
+ */
 void anscheduler_cpu_set_task(task_t * task);
+
+/**
+ * @critical
+ */
 void anscheduler_cpu_set_thread(thread_t * thread);
 
+/**
+ * Notify every CPU running a specified task that the task's virtual memory
+ * mapping has been modified.
+ * @critical
+ */
 void anscheduler_cpu_notify_invlpg(task_t * task);
+
+/**
+ * Notify every CPU running a task to switch tasks. This may be as simple as
+ * triggering an early timer tick on every CPU running the task.
+ * @critical
+ */
 void anscheduler_cpu_notify_dead(task_t * task);
 
 /**
@@ -126,24 +202,52 @@ void anscheduler_cpu_halt(); // wait until timer or interrupt
  ******************/
 
 /**
- * @noncritical This should be relatively simple and static.
+ * @noncritical or @critical This should be relatively simple and static.
  */
 uint64_t anscheduler_vm_physical(uint64_t virt); // global VM translation
 
 /**
- * @noncritical See anscheduler_vm_physical().
+ * @noncritical or @critical See anscheduler_vm_physical().
  */
 uint64_t anscheduler_vm_virtual(uint64_t phys); // global VM translation
 
+/**
+ * Create a root page table entry. On x86-64, this is a PML4.
+ * @critical
+ */
 void * anscheduler_vm_root_alloc();
+
+/**
+ * Map a virtual page to a physical page and set flags on the page.
+ * @return false if the operation failed (i.e. a page table could not be
+ * allocated).
+ * @critical
+ */
 bool anscheduler_vm_map(void * root,
                         uint64_t vpage,
                         uint64_t dpage,
                         uint16_t flags);
+                        
+/**
+ * Unmap a virtual page in a virtual memory mapping.
+ * @critical
+ */
 void anscheduler_vm_unmap(void * root, uint64_t vpage);
+
+/**
+ * Lookup the physical entry and flags for a given virtual page. If the page
+ * is not mapped, 0 should be returned along with 0 flags.
+ * @critical
+ */
 uint64_t anscheduler_vm_lookup(void * root,
                                uint64_t vpage,
                                uint16_t * flags);
+
+/**
+ * Free a virtual memory mapping. This should not assume that all memory has
+ * been unmapped. Be prepared to do a recursive memory free here.
+ * @critical
+ */
 void anscheduler_vm_root_free(void * root);
 
 #endif
