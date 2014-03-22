@@ -1,4 +1,3 @@
-
 void anscheduler_timer_set(uint32_t ticks);
 void anscheduler_timer_set_far();
 void anscheduler_timer_cancel();
