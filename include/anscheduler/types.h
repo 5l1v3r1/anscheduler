@@ -7,13 +7,14 @@
 
 #define ANSCHEDULER_MSG_TYPE_CONNECT 0
 #define ANSCHEDULER_MSG_TYPE_DATA 1
+#define ANSCHEDULER_MSG_TYPE_CLOSE 2
 
 #define ANSCHEDULER_MAX_MSG_BUFFER 0x8
 
 typedef struct task_t task_t;
 typedef struct thread_t thread_t;
 typedef struct socket_t socket_t;
-typedef struct socket_link_t socket_link_t;
+typedef struct socket_desc_t socket_desc_t;
 typedef struct socket_msg_t socket_msg_t;
 
 struct task_t {
@@ -33,11 +34,11 @@ struct task_t {
   
   // hash map of open sockets
   uint64_t socketsLock;
-  socket_link_t * sockets[0x10];
+  socket_desc_t * sockets[0x10];
   
   // list of sockets with pending messages
   uint64_t pendingLock;
-  socket_link_t * firstPending;
+  socket_desc_t * firstPending;
   
   // list of threads in this task
   uint64_t threadsLock;
@@ -77,19 +78,25 @@ struct thread_t {
  * two socket endpoints, the connector and the receiver.
  */
 struct socket_t {
-  uint64_t connRecLock; // locks the two fields that follow
-  socket_link_t * connector, * receiver;
+  // when a link is set to NULL, it means that the link will *never* access
+  // the socket again
+  uint64_t connRecLock;
+  socket_desc_t * connector, * receiver;
   
-  uint64_t msgsLock; // locks the next 6 fields
+  uint64_t forConnectorLock;
   uint64_t forConnectorCount;
-  socket_msg_t * forConnectorFirst, * forConnectorLast;
+  socket_msg_t * forConnectorFirst;
+  socket_msg_t * forConnectorLast;
+  
+  uint64_t forReceiverLock;
   uint64_t forReceiverCount;
-  socket_msg_t * forReceiverFirst, * forReceiverLast;
+  socket_msg_t * forReceiverFirst;
+  socket_msg_t * forReceiverLast;
 } __attribute__((packed));
 
-struct socket_link_t {
-  socket_link_t * next, * last; // in the task
-  socket_link_t * pendingNext, * pendingLast; // in the task's pending list
+struct socket_desc_t {
+  socket_desc_t * next, * last; // in the hashmap
+  socket_desc_t * pendingNext, * pendingLast; // in the pending list
   
   socket_t * socket; // underlying socket
   uint64_t descriptor; // task specific fd
@@ -104,18 +111,10 @@ struct socket_link_t {
 } __attribute__((packed));
 
 struct socket_msg_t {
-  socket_msg_t * next, * last;
+  socket_msg_t * next;
   uint64_t type;
   uint64_t len;
-  char message[0xfe8]; // 0x1000 - 0x18
-  
-  // message types:
-  // 0 = connect
-  // 1 = data
-  // 2 = closed by remote
-  // 3 = remote killed by external task
-  // 4 = remote exit
-  // 5 = remote killed because of memory fault
+  uint8_t message[0xfe8]; // 0x1000 - 0x18
 } __attribute__((packed));
 
 #endif
