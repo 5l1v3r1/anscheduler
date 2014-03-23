@@ -330,8 +330,12 @@ static void _free_task_method(task_t * task) {
   anscheduler_pidmap_unset(task);
   anscheduler_cpu_unlock();
   
+  printf("closing sockets...\n");
+  
   // wait for each socket to die so that we know nothing references the task
   _close_task_sockets_async(task);
+  
+  printf("freeing code...\n");
   
   // release the task's code
   if (!__sync_sub_and_fetch(task->codeRetainCount, 1)) {

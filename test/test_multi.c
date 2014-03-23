@@ -69,6 +69,7 @@ void thread_body() {
     pthread_t thread;
     pthread_create(&thread, NULL, check_for_leaks, NULL);
   }
+  
   anscheduler_cpu_lock();
   printf("calling exit...\n");
   anscheduler_task_exit(0);

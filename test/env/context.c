@@ -15,14 +15,12 @@ void anscheduler_set_state(thread_t * thread,
                            void * ip,
                            void * arg1) {
   bzero(&thread->state, sizeof(thread->state));
-  uint64_t flags;
-  __asm__("pushfq\npop %0" : "=r" (flags));
   
+  __asm__("pushfq\npop %0" : "=r" (thread->state.flags));
   thread->state.rip = (uint64_t)ip;
   thread->state.rsp = (uint64_t)stack;
   thread->state.rbp = (uint64_t)stack;
   thread->state.rdi = (uint64_t)arg1;
-  thread->state.flags = flags;
 }
 
 bool anscheduler_save_return_state(thread_t * thread) {

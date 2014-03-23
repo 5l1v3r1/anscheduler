@@ -8,6 +8,7 @@ static thread_t * firstThread = NULL;
 static thread_t * lastThread = NULL;
 
 static thread_t * _next_thread(uint64_t * timeout);
+static thread_t * _shift_thread();
 static void _push_unconditional(thread_t * thread);
 static void _delete_cur_kernel(void * unused);
 static void _switch_to_thread(thread_t * thread);
@@ -119,7 +120,7 @@ void anscheduler_loop_push_kernel(void * arg, void (* fn)(void * arg)) {
   }
   anscheduler_zero(thread, sizeof(thread_t));
   thread->stack = (uint64_t)stack;
-  anscheduler_set_state(thread, stack, fn, arg);
+  anscheduler_set_state(thread, stack + 0x1000, fn, arg);
   anscheduler_loop_push(thread);
 }
 
@@ -137,10 +138,7 @@ static thread_t * _next_thread(uint64_t * timeout) {
   uint64_t now = anscheduler_get_time();
   (*timeout) = (anscheduler_second_length() >> 6);
   for (i = 0; i < max; i++) {
-    thread_t * th = firstThread;
-    
-    firstThread = th->queueNext;
-    if (!firstThread) lastThread = NULL;
+    thread_t * th = _shift_thread();
     
     if (th->nextTimestamp > now) {
       _push_unconditional(th);
@@ -162,6 +160,14 @@ static thread_t * _next_thread(uint64_t * timeout) {
   
   anscheduler_unlock(&loopLock);
   return NULL;
+}
+
+static thread_t * _shift_thread() {
+  thread_t * th = firstThread;
+  firstThread = th->queueNext;
+  if (!firstThread) lastThread = NULL;
+  th->queueNext = (th->queueLast = NULL);
+  return th;
 }
 
 static void _push_unconditional(thread_t * thread) {
