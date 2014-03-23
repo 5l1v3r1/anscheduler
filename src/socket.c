@@ -248,6 +248,7 @@ static socket_desc_t * _create_descriptor(socket_t * socket,
   }
   anscheduler_unlock(&socket->connRecLock);
   
+  anscheduler_descriptor_set(task, desc);
   return desc;
 }
 

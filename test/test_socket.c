@@ -69,7 +69,7 @@ void server_thread() {
     anscheduler_cpu_lock();
     anscheduler_save_return_state(thread, NULL, syscall_cont);
     anscheduler_cpu_unlock();
-    printf("got message!\n");
+    // printf("got message!\n");
   }
 }
 
