@@ -28,6 +28,8 @@ cpu_info * antest_get_current_cpu_info() {
 void antest_launch_thread(void * arg, void (* method)(void *)) {
   pthread_t thread;
   newthread_args * args = malloc(sizeof(newthread_args));
+  args->method = method;
+  args->arg = arg;
   pthread_create(&thread, NULL, (void * (*)(void *))thread_enter, args);
 }
 

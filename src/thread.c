@@ -200,7 +200,7 @@ bool _alloc_kernel_stack(task_t * task, thread_t * thread) {
     anscheduler_free(buffer);
     return false;
   }
-  anscheduler_lock(&task->vmLock);
+  anscheduler_unlock(&task->vmLock);
   return true;
 }
 
