@@ -202,6 +202,8 @@ static task_t * _create_bare_task() {
   if (!task) return NULL;
   anscheduler_zero(task, sizeof(task_t));
   
+  task->refCount = 1;
+  
   if (!(task->vm = anscheduler_vm_root_alloc())) {
     anscheduler_free(task);
     return NULL;

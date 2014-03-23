@@ -17,7 +17,7 @@
  * Creates a task by allocating a new page table and mapping+copying new pages
  * in from `code` of length `len`.
  * @return a new task, or NULL if allocation failed. The ref count will start
- * at 0.
+ * at 1.
  * @critical The copy operation is all done from a critical section, so this
  * really should only be done once at boot with the bootstrap task. After that
  * every new execution should be done with task_fork_code().
