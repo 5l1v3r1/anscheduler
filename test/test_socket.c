@@ -23,6 +23,8 @@ typedef struct {
   // 2 - closer closed; now closerFd is invalidated
   int closerStage;
   uint64_t closerFd;
+  
+  int doneClosee; // 1 if done
 } server_scope;
 
 void proc_enter(void * flag);
@@ -42,7 +44,7 @@ void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg);
 
 int main() {
   // create one CPU
-  // antest_launch_thread(NULL, proc_enter);
+  antest_launch_thread(NULL, proc_enter);
   antest_launch_thread((void *)1, proc_enter);
   
   while (1) {
@@ -127,12 +129,13 @@ void client_closee_thread() {
   anscheduler_save_return_state(thread, NULL, syscall_cont);
   anscheduler_cpu_unlock();
   
+  anscheduler_cpu_lock();
   // TODO: here, verify that the other end hung up
   desc = anscheduler_socket_for_descriptor(fd);
   anscheduler_socket_close(desc, 0);
   anscheduler_socket_dereference(desc);
   
-  anscheduler_cpu_lock();
+  printf("closee done\n");
   anscheduler_task_exit(0);
 }
 
@@ -224,5 +227,15 @@ void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
     assert(desc != NULL);
     anscheduler_socket_close(desc, 0);
     anscheduler_socket_dereference(desc);
+  } else if (msg->len == 0x17) {
+    if (!memcmp("you wanna go on a date?", (const char *)msg->message, 0x17)) {
+      // close the bastard downnnnnn
+      // TODO: send big fat "NO" message here! lololol
+      socket_desc_t * desc = anscheduler_socket_for_descriptor(fd);
+      assert(desc != NULL);
+      anscheduler_socket_close(desc, 0);
+      anscheduler_socket_dereference(desc);
+      scope->doneClosee = true;
+    }
   }
 }
