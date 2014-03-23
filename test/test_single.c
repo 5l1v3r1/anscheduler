@@ -44,6 +44,6 @@ void proc_enter(void * unused) {
 }
 
 void user_thread_test() {
-  printf("running user thread!\n");
+  printf("test passed!\n");
   exit(0);
 }

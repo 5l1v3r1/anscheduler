@@ -48,7 +48,7 @@ bool anscheduler_vm_map(void * root,
     }
   }
   
-  table[ptIndex] = dpage | flags;
+  table[ptIndex] = (dpage << 12) | flags;
   return true;
 }
 

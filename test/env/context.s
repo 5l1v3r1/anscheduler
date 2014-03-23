@@ -10,6 +10,8 @@ _antest_save_return_state:
 
 global antest_thread_run
 antest_thread_run:
+  add rsi, 0x40 ; point directly to the state
+
   ; push SS
   xor rax, rax
   mov ax, ss
@@ -37,7 +39,6 @@ antest_thread_run:
   
   ; copy up to rbp
   mov rcx, 6
-  add rsi, 0x40
   mov rdi, rsp
   rep movsq
   

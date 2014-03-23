@@ -12,6 +12,7 @@ static void _user_thread_entry(void * rip);
 static void _free_old_stack(void * oldStack, void (* fn)());
 
 void antest_configure_user_thread(thread_t * thread, void (* rip)()) {
+  __asm__("pushfq\npop %0" : "=r" (thread->state.flags));
   thread->state.rip = (uint64_t)_user_thread_entry;
   thread->state.rsp = (uint64_t)anscheduler_alloc(0x1000) + 0x1000L;
   thread->state.rbp = thread->state.rsp;
@@ -23,7 +24,7 @@ void antest_user_thread_page_fault(void * addr, bool write) {
   // trigger a page fault an send it to the scheduler
   uint16_t flags = ANSCHEDULER_PAGE_FAULT_PRESENT
     | ANSCHEDULER_PAGE_FAULT_USER;
-  if (write) flags = ANSCHEDULER_PAGE_FAULT_WRITE;
+  if (write) flags |= ANSCHEDULER_PAGE_FAULT_WRITE;
   
   thread_t * thread = anscheduler_cpu_get_thread();
   bool ret = anscheduler_save_return_state(thread);
@@ -57,9 +58,8 @@ static void _user_thread_entry(void * rip) {
   // free the stack we are using now
   uint64_t rsp;
   __asm__("mov %%rsp, %0" : "=r" (rsp));
-  void * addr = (void *)(rsp & 0xfffffffffffff000);
+  void * addr = (void *)(rsp & 0xfffffffffffff000L);
   
-  antest_get_current_cpu_info()->isLocked = false;
   // boom, jump right out of this place!
   __asm__("mov %0, %%rsp\ncallq *%1"
           : : "b" (newStack), "a" (_free_old_stack),
@@ -68,5 +68,6 @@ static void _user_thread_entry(void * rip) {
 
 static void _free_old_stack(void * oldStack, void (* fn)()) {
   anscheduler_free(oldStack);
+  antest_get_current_cpu_info()->isLocked = false;
   fn();
 }
