@@ -27,7 +27,7 @@ void thread_poll_syscall(void * unused);
 
 int main() {
   // create one CPU
-  antest_launch_thread(NULL, proc_enter);
+  // antest_launch_thread(NULL, proc_enter);
   antest_launch_thread((void *)1, proc_enter);
   
   while (1) {
@@ -40,7 +40,7 @@ int main() {
 void proc_enter(void * flag) {
   if (flag) {
     create_thread(server_thread);
-    //create_thread(client_closer_thread);
+    create_thread(client_closer_thread);
     //create_thread(client_closee_thread);
     //create_thread(client_keepalive_thread);
   }
@@ -67,6 +67,7 @@ void server_thread() {
   while (1) {
     anscheduler_cpu_lock();
     bool res = anscheduler_save_return_state(thread);
+    printf("got res %d\n", res);
     anscheduler_cpu_unlock();
     if (res) {
       // TODO: here, process incoming packets
@@ -85,6 +86,7 @@ void client_closer_thread() {
   uint64_t fd = desc->descriptor;
   task_t * target = anscheduler_task_for_pid(0);
   assert(target != NULL);
+  assert(target != anscheduler_cpu_get_task());
   bool result = anscheduler_socket_connect(desc, target);
   assert(result);
   
@@ -124,7 +126,7 @@ void thread_poll_syscall(void * unused) {
   task_t * task = anscheduler_cpu_get_task();
   if (!anscheduler_thread_poll()) {
     anscheduler_thread_run(task, anscheduler_cpu_get_thread());
-  } else {                                                   
+  } else {
     anscheduler_cpu_set_task(NULL);
     anscheduler_cpu_set_thread(NULL);
     anscheduler_task_dereference(task);

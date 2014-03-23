@@ -14,7 +14,9 @@ static void _free_old_stack(void * oldStack, void (* fn)());
 void antest_configure_user_thread(thread_t * thread, void (* rip)()) {
   __asm__("pushfq\npop %0" : "=r" (thread->state.flags));
   thread->state.rip = (uint64_t)_user_thread_entry;
-  thread->state.rsp = (uint64_t)anscheduler_alloc(0x1000) + 0x1000L;
+  // subtract 8 from the stack pointer because it needs to be aligned
+  // for OS X
+  thread->state.rsp = (uint64_t)anscheduler_alloc(0x1000) + 0xff8;
   thread->state.rbp = thread->state.rsp;
   thread->state.rdi = (uint64_t)rip;
   thread->state.cpuLocked = true;
