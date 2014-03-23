@@ -1,6 +1,7 @@
 #include <anscheduler/loop.h>
 #include <anscheduler/functions.h>
 #include <anscheduler/task.h>
+#include <assert.h>
 
 static uint64_t loopLock = 0;
 static uint64_t queueCount = 0;
