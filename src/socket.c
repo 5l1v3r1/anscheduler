@@ -197,6 +197,10 @@ socket_msg_t * anscheduler_socket_read(socket_desc_t * dest) {
 }
 
 bool anscheduler_socket_connect(socket_desc_t * socket, task_t * task) {
+  if (__sync_fetch_and_or(&socket->socket->hasBeenConnected, 1)) {
+    return false;
+  }
+  
   // generate another link
   socket_desc_t * link = _create_descriptor(socket->socket, task, false);
   if (!link) {
@@ -213,10 +217,9 @@ bool anscheduler_socket_connect(socket_desc_t * socket, task_t * task) {
   msg->type = ANSCHEDULER_MSG_TYPE_CONNECT;
   msg->len = 0;
   
-  // if we cannot send the message, we need to release our resources
+  // if we couldn't send the message, we'd need to release our resources
   if (!anscheduler_socket_msg(socket, msg)) {
-    anscheduler_free(msg);
-    anscheduler_socket_dereference(socket);
+    anscheduler_abort("failed to send connect message");
   }
   return true;
 }

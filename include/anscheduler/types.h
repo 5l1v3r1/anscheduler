@@ -92,6 +92,8 @@ struct socket_t {
   uint64_t forReceiverCount;
   socket_msg_t * forReceiverFirst;
   socket_msg_t * forReceiverLast;
+  
+  uint64_t hasBeenConnected;
 } __attribute__((packed));
 
 struct socket_desc_t {
