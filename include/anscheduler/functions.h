@@ -95,11 +95,14 @@ void anscheduler_set_state(thread_t * thread,
                            void * arg1);
 
 /**
- * If 0 is returned, this function has successfully saved a state into
- * the thread. If this method returns 1, then the thread's state has been
- * resumed!
+ * This function never returns. Instead, it saves the state if it were to
+ * return to a thread. Then, it calls a specified function and passes a
+ * pointer argument.
+ * @critical
  */
-bool anscheduler_save_return_state(thread_t * thread);
+void anscheduler_save_return_state(thread_t * thread,
+                                   void * arg,
+                                   void (* fn)(void *));
 
 /*********
  * Timer *

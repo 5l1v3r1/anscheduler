@@ -53,6 +53,11 @@ static void _close_task_sockets_async(task_t * task);
  */
 static void _task_exit(void * codeVal);
 
+/**
+ * @critical
+ */
+static void _resign_continuation(void * unused);
+
 /******************
  * Implementation *
  ******************/
@@ -407,9 +412,7 @@ static void _close_task_sockets_async(task_t * task) {
           break;
         }
         anscheduler_unlock(&task->socketsLock);
-        bool ret = anscheduler_save_return_state(thread);
-        if (ret) continue;
-        anscheduler_loop_resign();
+        anscheduler_save_return_state(thread, NULL, _resign_continuation);
       }
     }
     
@@ -426,4 +429,8 @@ static void _task_exit(void * codeVal) {
   anscheduler_task_kill(task, (uint64_t)codeVal);
   anscheduler_task_dereference(task);
   anscheduler_loop_run();
+}
+
+static void _resign_continuation(void * unused) {
+  anscheduler_loop_resign();
 }

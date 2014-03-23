@@ -48,6 +48,11 @@ static void _async_msg(msginfo_t * info);
  */
 static void _socket_free(socket_t * socket);
 
+/**
+ * @critical
+ */
+static void _switch_continuation(void * th);
+
 socket_desc_t * anscheduler_socket_new() {
   socket_t * socket = anscheduler_alloc(sizeof(socket_t));
   if (!socket) return NULL;
@@ -362,9 +367,8 @@ static void _wakeup_endpoint(socket_desc_t * dest) {
     if (__sync_fetch_and_and(&thread->isPolling, 0)) {
       anscheduler_unlock(&task->threadsLock);
       thread_t * curThread = anscheduler_cpu_get_thread();
-      bool res = anscheduler_save_return_state(curThread);
-      if (res) return;
-      anscheduler_loop_switch(task, thread);
+      
+      anscheduler_save_return_state(curThread, thread, _switch_continuation);
     }
     thread = thread->next;
   }
@@ -416,4 +420,9 @@ static void _socket_free(socket_t * socket) {
   anscheduler_cpu_lock();
   anscheduler_free(socket);
   anscheduler_cpu_unlock();
+}
+
+static void _switch_continuation(void * th) {
+  thread_t * thread = (thread_t *)th;
+  anscheduler_loop_switch(thread->task, thread);
 }
