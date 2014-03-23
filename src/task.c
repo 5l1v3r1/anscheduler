@@ -175,7 +175,7 @@ bool anscheduler_task_reference(task_t * task) {
 
 void anscheduler_task_dereference(task_t * task) {
   anscheduler_lock(&task->killLock);
-  if (!--task->refCount) {
+  if (!(--task->refCount)) {
     if (task->isKilled) {
       anscheduler_unlock(&task->killLock);
       return _generate_kill_job(task);

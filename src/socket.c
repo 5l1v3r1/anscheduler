@@ -77,7 +77,7 @@ void anscheduler_socket_dereference(socket_desc_t * socket) {
     anscheduler_unlock(&socket->closeLock);
     return;
   }
-  if (!(socket->refCount--) && socket->isClosed) {
+  if (!(--socket->refCount) && socket->isClosed) {
     anscheduler_unlock(&socket->closeLock);
     
     // we know the task is still alive because the socket is still in the

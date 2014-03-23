@@ -87,13 +87,14 @@ void anscheduler_loop_run() {
   uint64_t timeout = 0;
   thread_t * thread = _next_thread(&timeout);
   anscheduler_timer_set(timeout);
-  if (!thread) {
+  if (thread) {
+    anscheduler_cpu_set_task(thread->task);
+    anscheduler_cpu_set_thread(thread);
+    anscheduler_thread_run(thread->task, thread);
+  } else {
     anscheduler_cpu_unlock();
     while (1) anscheduler_cpu_halt();
   }
-  anscheduler_cpu_set_task(thread->task);
-  anscheduler_cpu_set_thread(thread);
-  anscheduler_thread_run(thread->task, thread);
 }
 
 void anscheduler_loop_break_task() {
