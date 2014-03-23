@@ -14,6 +14,16 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <assert.h>
+#include <string.h>
+
+typedef struct {
+  // closer stage:
+  // 0 - nothing has happened
+  // 1 - got message from closer, closerFd is set
+  // 2 - closer closed; now closerFd is invalidated
+  int closerStage;
+  uint64_t closerFd;
+} server_scope;
 
 void proc_enter(void * flag);
 void create_thread(void (* method)());
@@ -26,8 +36,8 @@ void * check_for_leaks(void * arg);
 void syscall_cont(void * unused);
 void thread_poll_syscall(void * unused);
 
-void read_messages();
-void handle_message(socket_msg_t * msg);
+void read_messages(server_scope * scope);
+void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg);
 
 int main() {
   // create one CPU
@@ -64,6 +74,9 @@ void create_thread(void (* method)()) {
 }
 
 void server_thread() {
+  server_scope scope;
+  bzero(&scope, sizeof(scope));
+  
   // here, listen for sockets
   anscheduler_cpu_lock();
   thread_t * thread = anscheduler_cpu_get_thread();
@@ -72,7 +85,7 @@ void server_thread() {
     anscheduler_cpu_lock();
     anscheduler_save_return_state(thread, NULL, syscall_cont);
     anscheduler_cpu_unlock();
-    read_messages();
+    read_messages(&scope);
   }
 }
 
@@ -146,7 +159,7 @@ void thread_poll_syscall(void * unused) {
   }
 }
 
-void read_messages() {
+void read_messages(server_scope * scope) {
   while (1) {
     anscheduler_cpu_lock();
     socket_desc_t * desc = anscheduler_socket_next_pending();
@@ -158,8 +171,7 @@ void read_messages() {
     
     socket_msg_t * msg = anscheduler_socket_read(desc);
     while (msg) {
-      handle_message(msg);
-      
+      handle_message(scope, desc->descriptor, msg);
       anscheduler_free(msg);
       msg = anscheduler_socket_read(desc);
     }
@@ -169,6 +181,18 @@ void read_messages() {
   }
 }
 
-void handle_message(socket_msg_t * msg) {
-  printf("got message of type %llu and len %llu\n", msg->type, msg->len);
+void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
+  printf("fd 0x%llx got type=0x%llx, len=0x%llx\n",
+         fd, msg->type, msg->len);
+  
+  // initial closer
+  if (msg->type == 1 && msg->len == 16 && !scope->closerStage) {
+    if (!strcmp("I don't love you", (const char *)msg->message)) {
+      scope->closerStage = 1;
+      scope->closerFd = fd;
+    }
+  } else if (scope->closerStage == 1 && fd == scope->closerFd) {
+    assert(msg->type == 2);
+    scope->closerStage = 2;
+  }
 }
