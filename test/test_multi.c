@@ -77,8 +77,8 @@ void thread_body() {
 
 void * check_for_leaks(void * arg) {
   sleep(1);
-  if (antest_pages_alloced() != 0) {
-    fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced());
+  if (antest_pages_alloced() != 4) {
+    fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 4);
     exit(1);
   }
   exit(0);
