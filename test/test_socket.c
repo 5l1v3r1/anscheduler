@@ -26,6 +26,9 @@ void * check_for_leaks(void * arg);
 void syscall_cont(void * unused);
 void thread_poll_syscall(void * unused);
 
+void read_messages();
+void handle_message(socket_msg_t * msg);
+
 int main() {
   // create one CPU
   // antest_launch_thread(NULL, proc_enter);
@@ -69,7 +72,7 @@ void server_thread() {
     anscheduler_cpu_lock();
     anscheduler_save_return_state(thread, NULL, syscall_cont);
     anscheduler_cpu_unlock();
-    // printf("got message!\n");
+    read_messages();
   }
 }
 
@@ -88,7 +91,18 @@ void client_closer_thread() {
   desc = anscheduler_socket_for_descriptor(fd);
   assert(desc != NULL);
   
-  // TODO: send message here
+  socket_msg_t * msg = anscheduler_socket_msg_data("I don't love you", 0x10);
+  result = anscheduler_socket_msg(desc, msg);
+  assert(result);
+  
+  // this is a new critical section
+  desc = anscheduler_socket_for_descriptor(fd);
+  assert(desc != NULL);
+  anscheduler_socket_close(desc, 0);
+  anscheduler_socket_dereference(desc);
+  
+  desc = anscheduler_socket_for_descriptor(fd);
+  assert(desc == NULL);
   
   anscheduler_task_exit(0);
 }
@@ -130,4 +144,31 @@ void thread_poll_syscall(void * unused) {
     anscheduler_task_dereference(task);
     anscheduler_loop_run();
   }
+}
+
+void read_messages() {
+  while (1) {
+    anscheduler_cpu_lock();
+    socket_desc_t * desc = anscheduler_socket_next_pending();
+    
+    if (!desc) {
+      anscheduler_cpu_unlock();
+      return;
+    }
+    
+    socket_msg_t * msg = anscheduler_socket_read(desc);
+    while (msg) {
+      handle_message(msg);
+      
+      anscheduler_free(msg);
+      msg = anscheduler_socket_read(desc);
+    }
+    
+    anscheduler_socket_dereference(desc);
+    anscheduler_cpu_unlock();
+  }
+}
+
+void handle_message(socket_msg_t * msg) {
+  printf("got message of type %llu and len %llu\n", msg->type, msg->len);
 }

@@ -368,8 +368,8 @@ static void _wakeup_endpoint(socket_desc_t * dest) {
     if (__sync_fetch_and_and(&thread->isPolling, 0)) {
       anscheduler_unlock(&task->threadsLock);
       thread_t * curThread = anscheduler_cpu_get_thread();
-      
       anscheduler_save_return_state(curThread, thread, _switch_continuation);
+      return;
     }
     thread = thread->next;
   }
