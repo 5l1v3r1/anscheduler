@@ -71,7 +71,6 @@ void thread_body() {
   }
   
   anscheduler_cpu_lock();
-  printf("calling exit...\n");
   anscheduler_task_exit(0);
 }
 
@@ -82,6 +81,7 @@ void * check_for_leaks(void * arg) {
     fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 5);
     exit(1);
   }
+  printf("test passed!\n");
   exit(0);
   return NULL;
 }

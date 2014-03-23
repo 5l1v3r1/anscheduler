@@ -98,6 +98,9 @@ void anscheduler_set_state(thread_t * thread,
  * This function never returns. Instead, it saves the state if it were to
  * return to a thread. Then, it calls a specified function and passes a
  * pointer argument.
+ * @param thread The thread whose state to store into
+ * @param arg The argument to pass to the following function.
+ * @param fn A function which should NEVER RETURN
  * @critical
  */
 void anscheduler_save_return_state(thread_t * thread,

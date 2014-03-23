@@ -8,8 +8,14 @@
 #include <anscheduler/thread.h>
 #include <assert.h>
 
+typedef struct {
+  void * addr;
+  uint64_t flags;
+} __attribute__((packed)) page_fault_info;
+
 static void _user_thread_entry(void * rip);
 static void _free_old_stack(void * oldStack, void (* fn)());
+static void _page_fault_cont(void * faultInfo);
 
 void antest_configure_user_thread(thread_t * thread, void (* rip)()) {
   __asm__("pushfq\npop %0" : "=r" (thread->state.flags));
@@ -29,10 +35,11 @@ void antest_user_thread_page_fault(void * addr, bool write) {
   if (write) flags |= ANSCHEDULER_PAGE_FAULT_WRITE;
   
   thread_t * thread = anscheduler_cpu_get_thread();
-  bool ret = anscheduler_save_return_state(thread);
-  if (ret) return;
   
-  anscheduler_page_fault(addr, flags);
+  page_fault_info info;
+  info.addr = addr;
+  info.flags = flags;
+  anscheduler_save_return_state(thread, &info, _page_fault_cont);
 }
 
 void * antest_user_thread_stack_addr() {
@@ -72,4 +79,9 @@ static void _free_old_stack(void * oldStack, void (* fn)()) {
   anscheduler_free(oldStack);
   antest_get_current_cpu_info()->isLocked = false;
   fn();
+}
+
+static void _page_fault_cont(void * faultInfo) {
+  page_fault_info info = *((page_fault_info *)faultInfo);
+  anscheduler_page_fault(info.addr, info.flags);
 }

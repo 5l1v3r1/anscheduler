@@ -23,6 +23,7 @@ void client_closee_thread();
 void client_keepalive_thread();
 void * check_for_leaks(void * arg);
 
+void syscall_cont(void * unused);
 void thread_poll_syscall(void * unused);
 
 int main() {
@@ -66,16 +67,9 @@ void server_thread() {
   anscheduler_cpu_unlock();
   while (1) {
     anscheduler_cpu_lock();
-    bool res = anscheduler_save_return_state(thread);
-    printf("got res %d\n", res);
+    anscheduler_save_return_state(thread, NULL, syscall_cont);
     anscheduler_cpu_unlock();
-    if (res) {
-      // TODO: here, process incoming packets
-      printf("got message!\n");
-      continue;
-    }
-    anscheduler_cpu_lock();
-    anscheduler_cpu_stack_run(NULL, thread_poll_syscall);
+    printf("got message!\n");
   }
 }
 
@@ -120,6 +114,10 @@ void * check_for_leaks(void * arg) {
   }
   exit(0);
   return NULL;
+}
+
+void syscall_cont(void * unused) {
+  anscheduler_cpu_stack_run(NULL, thread_poll_syscall);
 }
 
 void thread_poll_syscall(void * unused) {

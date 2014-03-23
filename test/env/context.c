@@ -23,19 +23,10 @@ void anscheduler_set_state(thread_t * thread,
   thread->state.rdi = (uint64_t)arg1;
 }
 
-bool anscheduler_save_return_state(thread_t * thread) {
-  uint64_t retAddr, rbp;
-  __asm__("movq 8(%%rbp), %0\nmov %%rbp, %1" : "=r" (retAddr), "=r" (rbp));
-  printf("saving return to %llx, rbp = %llx\n", retAddr, rbp);
-  
+void anscheduler_save_return_state(thread_t * thread,
+                                   void * arg,
+                                   void (* fn)(void *)) {
   cpu_info * info = antest_get_current_cpu_info();
   thread->state.cpuLocked = (uint64_t)info->isLocked;
-  bool res = antest_save_return_state(thread);
-  
-  if (res) {
-    uint64_t nretAddr;
-    __asm__("mov 8(%%rbp), %0\nmov %%rbp, %1" : "=r" (nretAddr), "=r" (rbp));
-    printf("return to %llx, old addr was %llx, rbp is %llx\n", nretAddr, retAddr, rbp);
-  }
-  return res;
+  antest_save_return_state(thread, arg, fn);
 }

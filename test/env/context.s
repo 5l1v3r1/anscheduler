@@ -66,9 +66,9 @@ antest_thread_run:
 
 global antest_save_return_state
 antest_save_return_state:
+  ; rsi is an argument, and rdx is a function to call
   ; rdi is our thread pointer...move it to point to the state
   add rdi, 0x40
-  mov qword [rdi], 1 ; return value
   
   ; rbx
   mov [rdi + 8], rbx
@@ -95,5 +95,13 @@ antest_save_return_state:
   pop rax
   mov [rdi + 0x88], rax
   
-  xor rax, rax
+  ; we need to align the stack on OS X, and it's nice to have frames
+  push rbp
+  mov rbp, rsp
+  ; call the continuation which should never return
+  mov rdi, rsi
+  call rdx
+  
+  ; SHOULD NEVER BE REACHED
+  leave
   ret
