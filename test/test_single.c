@@ -38,7 +38,6 @@ void proc_enter(void * unused) {
   anscheduler_thread_add(task, thread);
   anscheduler_task_dereference(task);
   
-  
   printf("entering CPU loop...\n");
   anscheduler_loop_run();
 }
