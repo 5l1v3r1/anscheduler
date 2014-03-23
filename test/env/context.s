@@ -38,7 +38,7 @@ antest_thread_run:
   sub rsp, 0x78
   
   ; copy up to rbp
-  mov rcx, 6
+  mov rcx, 7
   mov rdi, rsp
   rep movsq
   
