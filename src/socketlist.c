@@ -33,6 +33,12 @@ void anscheduler_descriptor_delete(task_t * task,
   }
   if (desc->next) desc->next->last = desc->last;
   desc->next = (desc->last = NULL);
+  
+  // now, free the descriptor here before unlocking so that we know the task
+  // cannot be freed yet
+  anscheduler_lock(&task->descriptorsLock);
+  anidxset_put(&task->descriptors, desc->descriptor);
+  anscheduler_unlock(&task->descriptorsLock);
   anscheduler_unlock(&task->socketsLock);
 }
 

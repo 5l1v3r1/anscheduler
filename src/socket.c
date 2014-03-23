@@ -240,6 +240,10 @@ static socket_desc_t * _create_descriptor(socket_t * socket,
   desc->refCount = 1;
   desc->isConnector = isConnector;
   
+  anscheduler_lock(&task->descriptorsLock);
+  desc->descriptor = anidxset_get(&task->descriptors);
+  anscheduler_unlock(&task->descriptorsLock);
+  
   anscheduler_lock(&socket->connRecLock);
   if (isConnector) {
     socket->connector = desc;
