@@ -1,7 +1,6 @@
 #include <anscheduler/loop.h>
 #include <anscheduler/functions.h>
 #include <anscheduler/task.h>
-#include <assert.h>
 
 static uint64_t loopLock = 0;
 static uint64_t queueCount = 0;
@@ -138,7 +137,10 @@ static thread_t * _next_thread(uint64_t * timeout) {
   (*timeout) = (anscheduler_second_length() >> 6);
   for (i = 0; i < max; i++) {
     thread_t * th = firstThread;
+    
     firstThread = th->queueNext;
+    if (!firstThread) lastThread = NULL;
+    
     if (th->nextTimestamp > now) {
       _push_unconditional(th);
       if (th->nextTimestamp - now < *timeout) {
