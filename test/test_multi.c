@@ -63,7 +63,7 @@ void thread_body() {
   uint64_t dest = CPU_COUNT * THREADS_PER_CPU;
   if (__sync_add_and_fetch(&threadsDone, 1) == dest) {
     printf("all threads completed!\n");
-    //exit(0);
+    exit(0);
   }
   anscheduler_cpu_lock();
   printf("calling exit...\n");

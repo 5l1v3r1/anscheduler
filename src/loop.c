@@ -17,6 +17,7 @@ static void _resign_stub(void * unused);
 void anscheduler_loop_push_cur() {
   thread_t * thread = anscheduler_cpu_get_thread();
   task_t * task = anscheduler_cpu_get_task();
+  if (!thread) return;
   if (task) anscheduler_cpu_set_task(NULL);
   anscheduler_cpu_set_thread(NULL);
   
