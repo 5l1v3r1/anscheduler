@@ -21,6 +21,13 @@ socket_desc_t * anscheduler_socket_new();
 socket_desc_t * anscheduler_socket_for_descriptor(uint64_t desc);
 
 /**
+ * Gets a socket which has pending data on it. The returned socket will be
+ * referenced. If NULL is returned, no sockets are currently pending.
+ * @critical
+ */
+socket_desc_t * anscheduler_socket_next_pending();
+
+/**
  * Reference a socket. Returns false if the socket has been closed.
  * @critical
  */

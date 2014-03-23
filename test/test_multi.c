@@ -77,6 +77,7 @@ void thread_body() {
 
 void * check_for_leaks(void * arg) {
   sleep(1);
+  // one PID pool + 4 CPU stacks = 5 pages!
   if (antest_pages_alloced() != 5) {
     fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 5);
     exit(1);

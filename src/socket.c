@@ -60,6 +60,11 @@ socket_desc_t * anscheduler_socket_for_descriptor(uint64_t desc) {
   return anscheduler_descriptor_find(task, desc);
 }
 
+socket_desc_t * anscheduler_socket_next_pending() {
+  task_t * task = anscheduler_cpu_get_task();
+  return anscheduler_task_pop_pending(task);
+}
+
 bool anscheduler_socket_reference(socket_desc_t * socket) {
   anscheduler_lock(&socket->closeLock);
   if (socket->isClosed) {
