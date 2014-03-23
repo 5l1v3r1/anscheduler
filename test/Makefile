@@ -1,4 +1,5 @@
 CFILES=$(wildcard env/*.c)
+ASMFILES=$(wildcard env/*.s)
 CFLAGS=-Wall -I../include -I./include -I../lib/anidxset/src -I../lib/anlock/src
 TEST_PROGS=test_single.c
 BUILD_FILES=../lib/anlock/build/*.o ../lib/anidxset/build/*.o ../build/*.o env/build/*.o
@@ -11,6 +12,9 @@ tests: testLib build env/build
 testLib: ansched_lib anidxset_lib anlock_lib env/build
 	for file in $(CFILES); do \
 		gcc $(CFLAGS) -c $$file -o env/build/`basename $$file .c`.o; \
+	done
+	for file in $(ASMFILES); do \
+		nasm -f `if [ \`uname\` = Darwin ]; then echo macho64; else echo elf64; fi` $$file -o env/build/`basename $$file .s`_s.o; \
 	done
 
 ansched_lib:
