@@ -6,6 +6,7 @@
 #include "env/threading.h"
 #include <anscheduler/thread.h>
 #include <anscheduler/task.h>
+#include <anscheduler/loop.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -39,9 +40,7 @@ void proc_enter(void * unused) {
   
   
   printf("entering CPU loop...\n");
-  while (1) {
-    anscheduler_cpu_halt();
-  }
+  anscheduler_loop_run();
 }
 
 void user_thread_test() {
