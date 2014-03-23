@@ -117,6 +117,7 @@ void client_closer_thread() {
   desc = anscheduler_socket_for_descriptor(fd);
   assert(desc == NULL);
   
+  printf("closer done.\n");
   anscheduler_task_exit(0);
 }
 
@@ -165,6 +166,8 @@ void client_keepalive_thread() {
   anscheduler_socket_close(desc, 0);
   anscheduler_socket_dereference(desc);
   
+  pthread_t athread;
+  pthread_create(&athread, NULL, check_for_leaks, NULL);
   printf("keepalive done\n");
   anscheduler_task_exit(0);
 }
@@ -176,6 +179,7 @@ void * check_for_leaks(void * arg) {
     fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 3);
     exit(1);
   }
+  printf("test passed!\n");
   exit(0);
   return NULL;
 }
