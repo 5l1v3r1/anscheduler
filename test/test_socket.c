@@ -35,6 +35,7 @@ void * check_for_leaks(void * arg);
 
 void syscall_cont(void * unused);
 void thread_poll_syscall(void * unused);
+socket_desc_t * connect_to_server();
 
 void read_messages(server_scope * scope);
 void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg);
@@ -55,7 +56,7 @@ void proc_enter(void * flag) {
   if (flag) {
     create_thread(server_thread);
     create_thread(client_closer_thread);
-    //create_thread(client_closee_thread);
+    create_thread(client_closee_thread);
     //create_thread(client_keepalive_thread);
   }
   anscheduler_loop_run();
@@ -92,20 +93,11 @@ void server_thread() {
 void client_closer_thread() {
   // here, open a socket, send "I don't love you", and close it
   anscheduler_cpu_lock();
-  socket_desc_t * desc = anscheduler_socket_new();
+  socket_desc_t * desc = connect_to_server();
   uint64_t fd = desc->descriptor;
-  task_t * target = anscheduler_task_for_pid(0);
-  assert(target != NULL);
-  assert(target != anscheduler_cpu_get_task());
-  bool result = anscheduler_socket_connect(desc, target);
-  assert(result);
-  
-  // this is a new critical section
-  desc = anscheduler_socket_for_descriptor(fd);
-  assert(desc != NULL);
   
   socket_msg_t * msg = anscheduler_socket_msg_data("I don't love you", 0x10);
-  result = anscheduler_socket_msg(desc, msg);
+  bool result = anscheduler_socket_msg(desc, msg);
   assert(result);
   
   // this is a new critical section
@@ -122,6 +114,24 @@ void client_closer_thread() {
 
 void client_closee_thread() {
   // here, open a socket, send "you wanna go on a date?", and wait for close
+  anscheduler_cpu_lock();
+  socket_desc_t * desc = connect_to_server();
+  uint64_t fd = desc->descriptor;
+  
+  socket_msg_t * msg = anscheduler_socket_msg_data("you wanna go on a date?",
+                                                   0x17);
+  bool result = anscheduler_socket_msg(desc, msg);
+  assert(result);
+  
+  thread_t * thread = anscheduler_cpu_get_thread();
+  anscheduler_save_return_state(thread, NULL, syscall_cont);
+  anscheduler_cpu_unlock();
+  
+  // TODO: here, verify that the other end hung up
+  desc = anscheduler_socket_for_descriptor(fd);
+  anscheduler_socket_close(desc, 0);
+  anscheduler_socket_dereference(desc);
+  
   anscheduler_cpu_lock();
   anscheduler_task_exit(0);
 }
@@ -159,6 +169,21 @@ void thread_poll_syscall(void * unused) {
   }
 }
 
+socket_desc_t * connect_to_server() {
+  socket_desc_t * desc = anscheduler_socket_new();
+  uint64_t fd = desc->descriptor;
+  task_t * target = anscheduler_task_for_pid(0);
+  assert(target != NULL);
+  assert(target != anscheduler_cpu_get_task());
+  bool result = anscheduler_socket_connect(desc, target);
+  assert(result);
+  
+  // this is a new critical section
+  desc = anscheduler_socket_for_descriptor(fd);
+  assert(desc != NULL);
+  return desc;
+}
+
 void read_messages(server_scope * scope) {
   while (1) {
     anscheduler_cpu_lock();
@@ -186,13 +211,18 @@ void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
          fd, msg->type, msg->len);
   
   // initial closer
-  if (msg->type == 1 && msg->len == 16 && !scope->closerStage) {
-    if (!strcmp("I don't love you", (const char *)msg->message)) {
+  if (msg->type == 1 && msg->len == 0x10 && !scope->closerStage) {
+    if (!memcmp("I don't love you", (const char *)msg->message, 0x10)) {
       scope->closerStage = 1;
       scope->closerFd = fd;
     }
   } else if (scope->closerStage == 1 && fd == scope->closerFd) {
     assert(msg->type == 2);
     scope->closerStage = 2;
+    
+    socket_desc_t * desc = anscheduler_socket_for_descriptor(fd);
+    assert(desc != NULL);
+    anscheduler_socket_close(desc, 0);
+    anscheduler_socket_dereference(desc);
   }
 }
