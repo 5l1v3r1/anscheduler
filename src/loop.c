@@ -7,7 +7,7 @@ static uint64_t queueCount = 0;
 static thread_t * firstThread = NULL;
 static thread_t * lastThread = NULL;
 
-static thread_t * _next_thread(uint64_t * nextTick);
+static thread_t * _next_thread(uint64_t * timeout);
 static void _push_unconditional(thread_t * thread);
 static void _delete_cur_kernel(void * unused);
 static void _switch_to_thread(thread_t * thread);
@@ -83,9 +83,9 @@ void anscheduler_loop_push(thread_t * thread) {
 }
 
 void anscheduler_loop_run() {
-  uint64_t nextTick = 0;
-  thread_t * thread = _next_thread(&nextTick);
-  anscheduler_timer_set(nextTick);
+  uint64_t timeout = 0;
+  thread_t * thread = _next_thread(&timeout);
+  anscheduler_timer_set(timeout);
   if (!thread) {
     anscheduler_cpu_unlock();
     while (1) anscheduler_cpu_halt();
@@ -129,17 +129,18 @@ void anscheduler_loop_switch(task_t * task, thread_t * thread) {
   anscheduler_cpu_stack_run(thread, (void (*)(void *))_switch_to_thread);
 }
 
-static thread_t * _next_thread(uint64_t * nextTick) {
+static thread_t * _next_thread(uint64_t * timeout) {
   anscheduler_lock(&loopLock);
   uint64_t i, max = queueCount;
-  (*nextTick) = anscheduler_get_time() + (anscheduler_second_length() >> 5);
+  uint64_t now = anscheduler_get_time();
+  (*timeout) = (anscheduler_second_length() >> 6);
   for (i = 0; i < max; i++) {
     thread_t * th = firstThread;
     firstThread = th->queueNext;
-    if (th->nextTimestamp > anscheduler_get_time()) {
+    if (th->nextTimestamp > now) {
       _push_unconditional(th);
-      if (th->nextTimestamp < *nextTick) {
-        (*nextTick) = th->nextTimestamp;
+      if (th->nextTimestamp - now < *timeout) {
+        (*timeout) = th->nextTimestamp - now;
       }
       continue;
     }

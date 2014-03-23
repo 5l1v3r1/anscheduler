@@ -89,7 +89,6 @@ void anscheduler_cpu_halt() {
     usleep(1000);
   }
   
-  anscheduler_cpu_lock();
   antest_handle_timer_interrupt();
 }
 

@@ -57,18 +57,15 @@ void create_a_thread() {
 
 void thread_body() {
   int i;
-  for (i = 0; i < 1000; i++) {
-    anscheduler_cpu_lock();
-    thread_t * thread = anscheduler_cpu_get_thread();
-    bool res = anscheduler_save_return_state(thread);
-    anscheduler_cpu_unlock();
-    if (!res) {
-      anscheduler_cpu_halt();
-    }
+  for (i = 0; i < 10; i++) {
+    anscheduler_cpu_halt();
   }
   uint64_t dest = CPU_COUNT * THREADS_PER_CPU;
-  if (__sync_fetch_and_add(&threadsDone, 1) == dest) {
+  if (__sync_add_and_fetch(&threadsDone, 1) == dest) {
     printf("all threads completed!\n");
-    exit(0);
+    //exit(0);
   }
+  anscheduler_cpu_lock();
+  printf("calling exit...\n");
+  anscheduler_task_exit(0);
 }
