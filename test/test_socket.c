@@ -25,6 +25,7 @@ typedef struct {
   uint64_t closerFd;
   
   int doneClosee; // 1 if done
+  int gotKeepalive; // 1 if keepalive has been received
 } server_scope;
 
 void proc_enter(void * flag);
@@ -59,7 +60,7 @@ void proc_enter(void * flag) {
     create_thread(server_thread);
     create_thread(client_closer_thread);
     create_thread(client_closee_thread);
-    //create_thread(client_keepalive_thread);
+    create_thread(client_keepalive_thread);
   }
   anscheduler_loop_run();
 }
@@ -89,6 +90,11 @@ void server_thread() {
     anscheduler_save_return_state(thread, NULL, syscall_cont);
     anscheduler_cpu_unlock();
     read_messages(&scope);
+    if (scope.closerStage == 2 && scope.doneClosee && scope.gotKeepalive) {
+      printf("server shutting down...\n");
+      anscheduler_cpu_lock();
+      anscheduler_task_exit(0);
+    }
   }
 }
 
@@ -142,6 +148,24 @@ void client_closee_thread() {
 void client_keepalive_thread() {
   // here, open a socket, send "marry me", and wait for it to close
   anscheduler_cpu_lock();
+  socket_desc_t * desc = connect_to_server();
+  uint64_t fd = desc->descriptor;
+  
+  socket_msg_t * msg = anscheduler_socket_msg_data("marry me", 8);
+  bool result = anscheduler_socket_msg(desc, msg);
+  assert(result);
+  
+  thread_t * thread = anscheduler_cpu_get_thread();
+  anscheduler_save_return_state(thread, NULL, syscall_cont);
+  anscheduler_cpu_unlock();
+  
+  anscheduler_cpu_lock();
+  // TODO: here, verify that the other end hung up
+  desc = anscheduler_socket_for_descriptor(fd);
+  anscheduler_socket_close(desc, 0);
+  anscheduler_socket_dereference(desc);
+  
+  printf("keepalive done\n");
   anscheduler_task_exit(0);
 }
 
@@ -228,7 +252,8 @@ void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
     anscheduler_socket_close(desc, 0);
     anscheduler_socket_dereference(desc);
   } else if (msg->len == 0x17) {
-    if (!memcmp("you wanna go on a date?", (const char *)msg->message, 0x17)) {
+    if (!memcmp("you wanna go on a date?",
+                (const char *)msg->message, 0x17)) {
       // close the bastard downnnnnn
       // TODO: send big fat "NO" message here! lololol
       socket_desc_t * desc = anscheduler_socket_for_descriptor(fd);
@@ -236,6 +261,10 @@ void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
       anscheduler_socket_close(desc, 0);
       anscheduler_socket_dereference(desc);
       scope->doneClosee = true;
+    }
+  } else if (msg->len == 8) {
+    if (!memcmp("marry me", (const char *)msg->message, 8)) {
+      scope->gotKeepalive = 1;
     }
   }
 }

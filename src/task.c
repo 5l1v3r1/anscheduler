@@ -398,25 +398,34 @@ static void _close_task_sockets_async(task_t * task) {
   
   int i;
   for (i = 0; i < 0x10; i++) {
-    anscheduler_lock(&task->socketsLock);
-    
-    while (task->sockets[i]) {
+    // free each socket with this descriptor hash (i is the hash, btw)
+    while (1) {
+      // reference the first socket
+      anscheduler_lock(&task->socketsLock);
       socket_desc_t * desc = task->sockets[i];
-      anscheduler_socket_close(desc, 1 | (task->killReason << 1));
+      if (desc) {
+        desc = (anscheduler_socket_reference(desc) ? desc : NULL);
+      }
       anscheduler_unlock(&task->socketsLock);
       
-      // wait until the descriptor is closed
+      // break if there *is* no first socket
+      if (!desc) break;
+      
+      // close the socket and wait for it to disappear from the list
+      anscheduler_socket_close(desc, 1 | (task->killReason << 1));
+      anscheduler_socket_dereference(desc);
       while (1) {
+        // we know another socket in the sockets[] array won't be the address
+        // of desc even though desc may be free'd, because if it's re-used
+        // it'll have to be re-used for some *other* task! 
         anscheduler_lock(&task->socketsLock);
         if (task->sockets[i] != desc) {
+          anscheduler_unlock(&task->socketsLock);
           break;
         }
-        anscheduler_unlock(&task->socketsLock);
         anscheduler_save_return_state(thread, NULL, _resign_continuation);
       }
     }
-    
-    anscheduler_unlock(&task->socketsLock);
   }
   
   anscheduler_cpu_unlock();
