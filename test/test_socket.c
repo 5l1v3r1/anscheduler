@@ -1,5 +1,7 @@
 /**
- * Test that the scheduler can run a single thread.
+ * Tests the basic functionality of message sending and the dynamics of
+ * sockets. Ensures that, when a task exits, its sockets are closed. This does
+ * NOT test for race conditions. Those will be tested somewhere else.
  */
 
 #include "env/user_thread.h"
@@ -44,7 +46,7 @@ void read_messages(server_scope * scope);
 void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg);
 
 int main() {
-  // create one CPU
+  // create two CPUs for balanced testing
   antest_launch_thread(NULL, proc_enter);
   antest_launch_thread((void *)1, proc_enter);
   

@@ -1,5 +1,5 @@
 /**
- * Test that the scheduler can run a single thread.
+ * Test that the scheduler can run multiple threads on multiple CPUs.
  */
 
 #include "env/user_thread.h"
@@ -24,7 +24,7 @@ void thread_body();
 void * check_for_leaks(void * arg);
 
 int main() {
-  // create one CPU
+  // create some CPUs
   int i;
   for (i = 0; i < CPU_COUNT; i++) {
     antest_launch_thread(NULL, proc_enter);
