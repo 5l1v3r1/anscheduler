@@ -99,9 +99,12 @@ static void * thread_enter(newthread_args * _args) {
   cpu = &cpus[cpuCount++];
   anlock_unlock(&cpusLock);
   
+  cpu->isLocked = true;
+  cpu->task = NULL;
+  cpu->thread = NULL;
+  cpu->nextInterrupt = 0xffffffffffffffffL;
   cpu->cpuStack = anscheduler_alloc(0x1000);
   
-  printf("in new thread!\n");
   args.method(args.arg);
   
   anlock_lock(&cpusLock);

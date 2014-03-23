@@ -26,7 +26,7 @@ void _dealloc_kernel_stack(task_t * task, thread_t * thread);
  */
 void _finalize_thread_exit(thread_t * thread);
 
-thread_t * anscheduler_create_thread(task_t * task) {
+thread_t * anscheduler_thread_create(task_t * task) {
   thread_t * thread = anscheduler_alloc(sizeof(thread_t));
   if (!thread) return NULL;
   
