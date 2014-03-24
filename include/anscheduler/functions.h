@@ -256,4 +256,10 @@ uint64_t anscheduler_vm_lookup(void * root,
  */
 void anscheduler_vm_root_free(void * root);
 
+/**
+ * Return the maximum page index in a page system. The argument `root` probably
+ * won't be needed since this value will be universal per-platform.
+ */
+uint64_t anscheduler_vm_max_page(void * root);
+
 #endif

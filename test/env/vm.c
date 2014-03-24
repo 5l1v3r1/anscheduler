@@ -85,6 +85,10 @@ void anscheduler_vm_root_free(void * root) {
   _table_free((uint64_t *)root, 0);
 }
 
+uint64_t anscheduler_vm_max_page(void * root) {
+  return 0xFFFFFFFFFL; // the maximum page
+}
+
 static void _table_free(uint64_t * table, int depth) {
   if (depth == 3) {
     return anscheduler_free(table);

@@ -56,6 +56,10 @@ struct task_t {
   uint64_t refCount; // when this reaches 0 and isKilled = 1, kill this task
   uint64_t isKilled; // 0 or 1, starts at 0
   uint64_t killReason;
+
+  // count the number of pages mapped specifically for this task's VM
+  uint64_t mappingsLock;
+  uint64_t mappingsCount;
 } __attribute__((packed));
 
 struct thread_t {
