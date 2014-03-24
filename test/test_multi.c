@@ -16,7 +16,7 @@
 #define THREADS_PER_CPU 4
 #define CPU_COUNT 4
 
-static int threadsDone = 0;
+static int threadsDone __attribute__((aligned(8))) = 0;
 
 void proc_enter(void * unused);
 void create_a_thread();
@@ -78,7 +78,8 @@ void * check_for_leaks(void * arg) {
   sleep(1);
   // one PID pool + 4 CPU stacks = 5 pages!
   if (antest_pages_alloced() != 5) {
-    fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 5);
+    fprintf(stderr, "leaked 0x%llx pages\n",
+            (unsigned long long)antest_pages_alloced() - 5);
     exit(1);
   }
   printf("test passed!\n");

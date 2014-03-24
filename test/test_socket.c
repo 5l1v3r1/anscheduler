@@ -178,7 +178,8 @@ void * check_for_leaks(void * arg) {
   sleep(1);
   // one PID pool + 2 CPU stacks = 3 pages!
   if (antest_pages_alloced() != 3) {
-    fprintf(stderr, "leaked 0x%llx pages\n", antest_pages_alloced() - 3);
+    fprintf(stderr, "leaked 0x%llx pages\n",
+            (unsigned long long)antest_pages_alloced() - 3);
     exit(1);
   }
   printf("test passed!\n");
@@ -241,7 +242,8 @@ void read_messages(server_scope * scope) {
 
 void handle_message(server_scope * scope, uint64_t fd, socket_msg_t * msg) {
   printf("fd 0x%llx got type=0x%llx, len=0x%llx\n",
-         fd, msg->type, msg->len);
+         (unsigned long long)fd, (unsigned long long)msg->type,
+         (unsigned long long)msg->len);
   
   // initial closer
   if (msg->type == 1 && msg->len == 0x10 && !scope->closerStage) {

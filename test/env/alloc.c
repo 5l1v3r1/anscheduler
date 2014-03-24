@@ -2,11 +2,11 @@
 #include "threading.h"
 #include <assert.h>
 
-static uint64_t allocedPieces = 0;
+static uint64_t allocedPieces __attribute__((aligned(8))) = 0;
 
 void * anscheduler_alloc(uint64_t size) {
   assert(antest_get_current_cpu_info()->isLocked);
-  assert((((uint64_t)&allocedPieces) & 0x8) == 0);
+  assert((((uint64_t)&allocedPieces) & 0x7) == 0);
   __asm__ __volatile__("lock incq (%0)" : : "r" (&allocedPieces));
   
   if (size > 0x1000) return NULL;
