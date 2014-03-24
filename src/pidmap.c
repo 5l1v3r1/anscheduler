@@ -3,12 +3,12 @@
 #include <anscheduler/functions.h>
 #include <anscheduler/task.h>
 
-static uint64_t pmLock = 0;
-static task_t * pidHashmap[0x100];
+static uint64_t pmLock __attribute__((aligned(8))) = 0;
+static task_t * pidHashmap[0x100] __attribute__((aligned(8)));
 
-static uint64_t ppLock = 0;
-static anidxset_root_t pidPool;
-static bool ppInitialized = 0;
+static uint64_t ppLock __attribute__((aligned(8))) = 0;
+static anidxset_root_t pidPool __attribute__((aligned(8)));
+static bool ppInitialized __attribute__((aligned(8))) = 0;
 
 static uint8_t _hash_pid(uint64_t pid);
 

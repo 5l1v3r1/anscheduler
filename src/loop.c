@@ -2,10 +2,10 @@
 #include <anscheduler/functions.h>
 #include <anscheduler/task.h>
 
-static uint64_t loopLock = 0;
-static uint64_t queueCount = 0;
-static thread_t * firstThread = NULL;
-static thread_t * lastThread = NULL;
+static uint64_t loopLock __attribute__((aligned(8))) = 0;
+static uint64_t queueCount __attribute__((aligned(8))) = 0;
+static thread_t * firstThread __attribute__((aligned(8))) = NULL;
+static thread_t * lastThread __attribute__((aligned(8))) = NULL;
 
 static thread_t * _next_thread(uint64_t * timeout);
 static thread_t * _shift_thread();

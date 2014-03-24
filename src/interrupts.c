@@ -3,8 +3,8 @@
 #include <anscheduler/task.h>
 #include <anscheduler/functions.h>
 
-static thread_t * interruptThread = NULL;
-static uint64_t threadLock = 0;
+static thread_t * interruptThread __attribute__((aligned(8))) = NULL;
+static uint64_t threadLock __attribute__((aligned(8))) = 0;
 
 void anscheduler_page_fault(void * ptr, uint64_t _flags) {
   task_t * task = anscheduler_cpu_get_task();
