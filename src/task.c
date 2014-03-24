@@ -49,11 +49,6 @@ static void _dealloc_task_code_async(task_t * task);
 static void _close_task_sockets_async(task_t * task);
 
 /**
- * @noncritical
- */
-static void _remove_task_mappings_async(task_t * task);
-
-/**
  * @critical
  */
 static void _task_exit(void * codeVal);
@@ -343,10 +338,6 @@ static void _free_task_method(task_t * task) {
   // wait for each socket to die so that we know nothing references the task
   _close_task_sockets_async(task);
 
-  // the task may have things mapped to its virtual address space; we should
-  // unmap these in a careful and non-blocking way
-  _remove_task_mappings_async(task);
-  
   // release the task's code
   if (!__sync_sub_and_fetch(task->codeRetainCount, 1)) {
     _dealloc_task_code_async(task);
@@ -367,12 +358,12 @@ static void _free_task_method(task_t * task) {
     anscheduler_cpu_unlock();
   }
   
+  anscheduler_vm_root_free_async(task->vm);
   anscheduler_cpu_lock();
-  
-  // free the general structures on the task
+
+  // free the general structures of the task
   anidxset_free(&task->stacks);
   anidxset_free(&task->descriptors);
-  anscheduler_vm_root_free(task->vm);
   
   anscheduler_pidmap_free_pid(task->pid);
   anscheduler_free(task);
@@ -438,26 +429,6 @@ static void _close_task_sockets_async(task_t * task) {
   }
   
   anscheduler_cpu_unlock();
-}
-
-static void _remove_task_mappings_async(task_t * task) {
-  uint64_t maxPage;
-  anscheduler_cpu_lock();
-  maxPage = anscheduler_vm_max_page(task->vm);
-  anscheduler_cpu_unlock();
-
-  while (1) {
-    anscheduler_cpu_lock();
-    // nothing should be locking the mappings anymore
-    if (!task->mappingsCount) {
-      anscheduler_cpu_unlock();
-      break;
-    }
-    uint64_t addr = maxPage - (task->mappingsCount - 1);
-    anscheduler_vm_unmap(task->vm, addr);
-    task->mappingsCount--;
-    anscheduler_cpu_unlock();
-  }
 }
 
 static void _task_exit(void * codeVal) {

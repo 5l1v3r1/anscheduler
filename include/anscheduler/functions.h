@@ -250,16 +250,19 @@ uint64_t anscheduler_vm_lookup(void * root,
                                uint16_t * flags);
 
 /**
- * Free a virtual memory mapping. This should not assume that all memory has
- * been unmapped. Be prepared to do a recursive memory free here.
- * @critical
+ * This will only be called early on if very little memory has been mapped
+ * Like anscheduler_vm_root_free_async(), but made to run in critical sections.
+ * @critical 
  */
 void anscheduler_vm_root_free(void * root);
 
 /**
- * Return the maximum page index in a page system. The argument `root` probably
- * won't be needed since this value will be universal per-platform.
+ * Free a virtual memory mapping. This should not assume that all memory has
+ * been unmapped. Be prepared to do a recursive memory free here.
+ * @noncritical Every time you free something, you should enter a critical
+ * section. You may have to unmap a lot of stuff, so your method should be
+ * interruptable.
  */
-uint64_t anscheduler_vm_max_page(void * root);
+void anscheduler_vm_root_free_async(void * root);
 
 #endif
