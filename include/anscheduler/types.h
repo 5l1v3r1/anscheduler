@@ -73,9 +73,8 @@ struct thread_t {
   uint64_t stack;
   
   bool isPolling; // 1 if waiting for a message (or an interrupt)
-  char reserved[3]; // for alignment
-  uint32_t irqs; // if this is the interrupt thread, these will be masked
-  
+  char reserved[7]; // for alignment
+    
   anscheduler_state state;
 } __attribute__((packed));
 

@@ -48,6 +48,12 @@ void anscheduler_set_interrupt_thread(thread_t * thread);
 void anscheduler_interrupt_thread_cmpnull(thread_t * thread);
 
 /**
+ * Reads the current interrupt mask and sets it back to zero.
+ * @critical
+ */
+uint32_t anscheduler_interrupt_mask();
+
+/**
  * Get the system thread which is responsible for handling non-trivial
  * application page faults.
  * @critical

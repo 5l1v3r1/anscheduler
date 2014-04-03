@@ -5,6 +5,7 @@
 
 static thread_t * interruptThread __attribute__((aligned(8))) = NULL;
 static uint64_t threadLock __attribute__((aligned(8))) = 0;
+static uint32_t irqMask __attribute__((aligned(8))) = 0;
 
 static thread_t * pagerThread __attribute__((aligned(8))) = 0;
 static uint64_t faultsLock __attribute__((aligned(8))) = 0;
@@ -74,7 +75,7 @@ void anscheduler_irq(uint8_t irqNumber) {
     return;
   }
   
-  anscheduler_or_32(&interruptThread->irqs, (1 << irqNumber));
+  anscheduler_or_32(&irqMask, (1 << irqNumber));
   bool result = __sync_fetch_and_and(&interruptThread->isPolling, 0);
   anscheduler_unlock(&threadLock);
   
@@ -107,6 +108,10 @@ void anscheduler_interrupt_thread_cmpnull(thread_t * thread) {
     interruptThread = NULL;
   }
   anscheduler_unlock(&threadLock);
+}
+
+uint32_t anscheduler_interrupt_mask() {
+  return __sync_fetch_and_and(&irqMask, 0);
 }
 
 thread_t * anscheduler_pager_thread() {
