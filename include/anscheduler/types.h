@@ -26,11 +26,6 @@ struct task_t {
   uint64_t pid;
   uint64_t uid;
   
-  // when this task exits, *codeRetainCount-- is performed. If the new
-  // value is 0, then the code data of this task is deallocated and so is
-  // the pointer to codeRetainCount.
-  uint64_t * codeRetainCount;
-  
   // virtual memory structure
   uint64_t vmLock;
   void * vm;
