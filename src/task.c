@@ -3,6 +3,7 @@
 #include <anscheduler/loop.h> // for kernel threads
 #include <anscheduler/thread.h> // for deallocation
 #include <anscheduler/socket.h> // for socket closing
+#include <anscheduler/paging.h>
 #include "util.h" // for idxset
 #include "pidmap.h"
 
@@ -149,6 +150,13 @@ void anscheduler_task_launch(task_t * task) {
 }
 
 void anscheduler_task_kill(task_t * task, uint64_t reason) {
+  // you cannot kill the system pager
+  if (anscheduler_pager_get()) {
+    if (task == anscheduler_pager_get()->task) {
+      return;
+    }
+  }
+  
   // emulate a test-and-or operation
   anscheduler_lock(&task->killLock);
   if (task->isKilled) {
