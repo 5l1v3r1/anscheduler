@@ -366,6 +366,7 @@ static void _free_task_method(task_t * task) {
     anscheduler_cpu_unlock();
   }
   
+  anscheduler_task_cleanup(task);
   anscheduler_vm_root_free_async(task->vm);
   anscheduler_cpu_lock();
 
