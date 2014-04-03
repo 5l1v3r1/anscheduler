@@ -18,6 +18,7 @@ typedef struct thread_t thread_t;
 typedef struct socket_t socket_t;
 typedef struct socket_desc_t socket_desc_t;
 typedef struct socket_msg_t socket_msg_t;
+typedef struct page_fault_t page_fault_t;
 
 struct task_t {
   task_t * next, * last;
@@ -122,6 +123,15 @@ struct socket_msg_t {
   uint64_t type;
   uint64_t len;
   uint8_t message[0xfe8]; // 0x1000 - 0x18
+} __attribute__((packed));
+
+struct page_fault_t {
+  page_fault_t * next;
+  
+  task_t * task; // referenced
+  thread_t * thread; // cannot die because it's idle
+  uint64_t page;
+  uint64_t flags;
 } __attribute__((packed));
 
 #endif

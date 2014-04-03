@@ -6,6 +6,10 @@
 static thread_t * interruptThread __attribute__((aligned(8))) = NULL;
 static uint64_t threadLock __attribute__((aligned(8))) = 0;
 
+static thread_t * pagerThread __attribute__((aligned(8))) = 0;
+static uint64_t faultsLock __attribute__((aligned(8))) = 0;
+static page_fault_t * firstFault = 0;
+
 void anscheduler_page_fault(void * ptr, uint64_t _flags) {
   task_t * task = anscheduler_cpu_get_task();
   if (!task) anscheduler_abort("kernel thread caused page fault!");
@@ -103,4 +107,37 @@ void anscheduler_interrupt_thread_cmpnull(thread_t * thread) {
     interruptThread = NULL;
   }
   anscheduler_unlock(&threadLock);
+}
+
+thread_t * anscheduler_pager_thread() {
+  return pagerThread;
+}
+
+void anscheduler_set_pager_thread(thread_t * thread) {
+  pagerThread = thread;
+}
+
+page_fault_t * anscheduler_page_fault_next() {
+  while (1) {
+    anscheduler_cpu_lock();
+    anscheduler_lock(&faultsLock);
+    page_fault_t * fault = firstFault;
+    if (fault) firstFault = fault->next;
+    anscheduler_unlock(&faultsLock);
+    if (!fault) {
+      anscheduler_cpu_unlock();
+      return NULL;
+    }
+    
+    if (!anscheduler_task_reference(fault->task)) {
+      anscheduler_task_dereference(fault->task);
+      anscheduler_free(fault);
+      anscheduler_cpu_unlock();
+      continue;
+    }
+    // the thing was already referenced anyway
+    anscheduler_task_dereference(fault->task);
+    anscheduler_cpu_unlock();
+    return fault;
+  }
 }
