@@ -7,14 +7,25 @@ static thread_t * pagerThread __attribute__((aligned(8))) = 0;
 static uint64_t faultsLock __attribute__((aligned(8))) = 0;
 static page_fault_t * firstFault = 0;
 
+typedef struct {
+  void * ptr;
+  uint64_t flags;
+} fault_info_t;
+
+static void _push_page_fault(fault_info_t * _info);
+static void _push_page_fault_cont(fault_info_t info);
+
 void anscheduler_page_fault(void * ptr, uint64_t _flags) {
   task_t * task = anscheduler_cpu_get_task();
   if (!task) anscheduler_abort("kernel thread caused page fault!");
   
+  fault_info_t info;
+  info.flags = _flags;
+  info.ptr = ptr;
+  
   if (_flags & ANSCHEDULER_PAGE_FAULT_PRESENT) {
-    // it wasn't an unallocated issue, and I don't support swap yet, so they
-    // need to die!
-    anscheduler_task_exit(ANSCHEDULER_TASK_KILL_REASON_MEMORY);
+    // there is nothing we can do here; it's up to the system pager to choose.
+    anscheduler_cpu_stack_run(&info, (void (*)(void *))_push_page_fault);
   }
   
   anscheduler_lock(&task->vmLock);
@@ -50,7 +61,7 @@ void anscheduler_page_fault(void * ptr, uint64_t _flags) {
     anscheduler_vm_map(task->vm, faultPage, physAlloc, flags);
   } else if (shouldFault) {
     anscheduler_unlock(&task->vmLock);
-    anscheduler_task_exit(ANSCHEDULER_TASK_KILL_REASON_MEMORY);
+    anscheduler_cpu_stack_run(&info, (void (*)(void *))_push_page_fault);
   }
   
   anscheduler_unlock(&task->vmLock);
@@ -87,5 +98,53 @@ page_fault_t * anscheduler_pager_read() {
     anscheduler_task_dereference(fault->task);
     anscheduler_cpu_unlock();
     return fault;
+  }
+}
+
+static void _push_page_fault(fault_info_t * _info) {
+  _push_page_fault_cont(*_info);
+  
+  // no other thread got woken up, so we should run the loop
+  task_t * curTask = anscheduler_cpu_get_task();
+  anscheduler_cpu_set_task(NULL);
+  anscheduler_cpu_set_thread(NULL);
+  if (curTask) anscheduler_task_dereference(curTask);
+  anscheduler_loop_run();
+}
+
+static void _push_page_fault_cont(fault_info_t info) {
+  if (!pagerThread) return;
+  
+  // get the current task and then make sure it doesn't get pushed again
+  task_t * curTask = anscheduler_cpu_get_task();
+  thread_t * curThread = anscheduler_cpu_get_thread();
+  if (!curTask) {
+    anscheduler_abort("a system thread caused a page fault");
+  }
+  
+  anscheduler_cpu_set_task(NULL);
+  anscheduler_cpu_set_thread(NULL);
+  page_fault_t * fault = anscheduler_alloc(sizeof(page_fault_t));
+  if (!fault) {
+    anscheduler_abort("failed to allocate fault object");
+  }
+  fault->task = curTask;
+  fault->thread = curThread;
+  fault->ptr = info.ptr;
+  fault->flags = info.flags;
+  
+  anscheduler_lock(&faultsLock);
+  fault->next = firstFault;
+  firstFault = fault;
+  anscheduler_unlock(&faultsLock);
+  
+  // wakeup the system pager if possible
+  bool result = __sync_fetch_and_and(&pagerThread->isPolling, 0);
+  if (result) {
+    task_t * task = pagerThread->task;
+    if (!anscheduler_task_reference(task)) {
+      anscheduler_abort("system pager may never die!");
+    }
+    anscheduler_loop_switch(task, pagerThread);
   }
 }

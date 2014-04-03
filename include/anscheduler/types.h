@@ -129,7 +129,9 @@ struct page_fault_t {
   
   task_t * task; // referenced
   thread_t * thread; // cannot die because it's idle
-  uint64_t page;
+  
+  // page fault information itself
+  void * ptr;
   uint64_t flags;
 } __attribute__((packed));
 
