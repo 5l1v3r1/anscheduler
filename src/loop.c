@@ -146,10 +146,11 @@ static thread_t * _next_thread(uint64_t * timeout) {
   for (i = 0; i < max; i++) {
     thread_t * th = _shift_thread();
     
-    if (th->nextTimestamp > now) {
+    uint64_t nextTs = th->nextTimestamp;
+    if (nextTs > now) {
       _push_unconditional(th);
-      if (th->nextTimestamp - now < *timeout) {
-        (*timeout) = th->nextTimestamp - now;
+      if (nextTs - now < *timeout) {
+        (*timeout) = nextTs - now;
       }
       continue;
     }
