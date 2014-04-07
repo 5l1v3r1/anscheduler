@@ -93,7 +93,8 @@ bool anscheduler_thread_poll() {
   }
   
   // If there are no message packets, we check if there are interrupts or fault
-  // signals; in this case, we may still need to return `false`.
+  // signals; these are special cases in which we need to start polling while
+  // a respective lock is held so that 
   if (thread == anscheduler_intd_get()) {
     anscheduler_intd_lock();
     if (!anscheduler_intd_waiting()) {
@@ -105,13 +106,17 @@ bool anscheduler_thread_poll() {
     anscheduler_intd_unlock();
   } else if (thread == anscheduler_pager_get()) {
     anscheduler_pager_lock();
-    if (anscheduler_pager_waiting()) {
+    if (!anscheduler_pager_waiting()) {
       thread->isPolling = 1;
       anscheduler_pager_unlock();
       anscheduler_unlock(&task->pendingLock);
       return true;
     }
     anscheduler_pager_unlock();
+  } else {
+    thread->isPolling = 1;
+    anscheduler_unlock(&task->pendingLock);
+    return true;
   }
   
   anscheduler_unlock(&task->pendingLock);
