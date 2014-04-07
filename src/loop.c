@@ -86,6 +86,13 @@ void anscheduler_loop_push(thread_t * thread) {
 }
 
 void anscheduler_loop_run() {
+  task_t * task = anscheduler_cpu_get_task();
+  anscheduler_cpu_set_task(NULL);
+  anscheduler_cpu_set_thread(NULL);
+  if (task) {
+    anscheduler_task_dereference(task);
+  }
+  
   uint64_t timeout = 0;
   thread_t * thread = _next_thread(&timeout);
   anscheduler_timer_set(timeout);
